@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List
 
 
-class User_Type(BaseModel):
+class UserModel(BaseModel):
     id: str
     username: str
     name: str
@@ -10,4 +10,4 @@ class User_Type(BaseModel):
     preferred_languages: List[str]
 
 
-__all__ = ["User_Type"]
+__all__ = ["UserModel"]

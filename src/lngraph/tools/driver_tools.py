@@ -1,184 +1,350 @@
-from langchain.tools import Tool, StructuredTool
-import time
-from datetime import datetime, timedelta
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional, Union, TypedDict
-from src.models.drivers_model import Driver_Model, Premium_driver_model
-from src.services.api_service import APIService
-import asyncio
+"""
+Driver tools for the cab booking bot.
+Simple tools that the LLM can use to interact with the API.
+"""
 
+from typing import Dict, List, Optional, Any, Union
+from langchain_core.tools import tool
+import logging
+from src.services.api_service import DriversAPIClient
+from src.models.tool_model import (
+    SearchDriversInput,
+    DriverInfoInput,
+    FilterDriverInput,
+    BookDriverInput,
+)
+from src.models.drivers_model import DriverModel, APIResponse
 
-class Drive_search_inputs(BaseModel):
-    """Input schema for driver search"""
-
-    city: str = Field(description="City name user want to travel from")
-    page: int = Field(default=0, description="Page number for pagination")
-    limit: int = Field(
-        default=10,
-        description="Limit for fetching number of premium\
-                drivers at once",
-    )
-    timestamp: int = Field(
-        description="timesatmp for verifying that request is not too old"
-    )
-    preference: Union[str, Dict] = Field(
-        default="",
-        description="Find premeium drivers based on user's preference, we'll\
-                empty it for now",
-    )
-
-
-class Driver_filter_inputs(BaseModel):
-    """Input schema for driver filtering"""
-
-    drivers: List[Dict[str, Any]] = Field(
-        description="List of drivers to\
-            filter from"
-    )
-    filters: Dict[str, Union[str, bool]] = Field(
-        description="Filter criteria set by user"
-    )
-
-
-class DriverCacheEntry(TypedDict):
-    data: List[Driver_Model]
-    expires: datetime
-
-
-class PremiumDriversCacheEntry(TypedDict):
-    data: List[Premium_driver_model]
-    expires: datetime
+logger = logging.getLogger(__name__)
 
 
 class DriverTools:
-    """It is a collection of all the tools related to drivers"""
+    """Simple tools for driver operations"""
 
-    def __init__(self, user_session_id: str):
-        self.api_service = APIService()
-        self.user_session_id = user_session_id
-        self._premium_drivers_cache: Dict[str, PremiumDriversCacheEntry] = {}
-        self._drivers_cache: Dict[str, DriverCacheEntry] = {}
+    def __init__(self, api_client: DriversAPIClient):
+        """
+        Initialize driver tools.
 
-    async def fetch_drivers(
+        Args:
+            api_client: Instance of PremiumDriversAPIClient
+            session_service: Session management instance
+        """
+        self.api_client = api_client
+
+    @tool(
+        description="""
+    Comprehensive driver search with advanced filtering and pagination support.
+    This is the primary tool for finding drivers based on various criteria:
+
+    **Core Functionality:**
+    - Full-featured driver search with 15+ filter options
+    - Intelligent caching for improved performance
+    - Pagination support for large result sets
+    - Multiple search strategies (city, geo-location, hybrid)
+
+    **Filter Categories:**
+    1. **Vehicle Preferences**: Types (sedan, SUV, etc.), specific models
+    2. **Demographics**: Age range, gender, marital status
+    3. **Service Options**: Pet-friendly, language preferences
+    4. **Professional Criteria**: Experience, completed rides, verification
+    5. **Location**: City-based or radius-based search
+
+    **Smart Features:**
+    - Hybrid search combines city and geo-location for best results
+    - Customizable sorting (by last active, rating, experience)
+    - Supports complex queries with multiple filters
+    - Returns metadata including total count and pagination info
+
+    **Example Queries:**
+    - "Find top-rated SUV drivers in Mumbai"
+    - "Show experienced female drivers who speak English in Delhi"
+    - "Get pet-friendly drivers with 5+ years experience"
+
+    **Response includes:**
+    - Matching drivers with complete profiles
+    - Total count and pagination details
+    - Applied filters for transparency
+    - Success/error status
+    """,
+        args_schema=SearchDriversInput,
+    )
+    async def search_drivers_tool(
         self,
         city: str,
         page: int,
         limit: int = 10,
-        timestamp: int = int(time.time()),
-        preference: str = "",
-    ) -> List[Premium_driver_model]:
-        """Fetch premium drivers and parse it according\
-                to our Premium_driver_model"""
-
-        cache_key = f"Premium_driver_{self.user_session_id}_{city}_{page}"
-        if cache_key in self._premium_drivers_cache:
-            cached_data = self._premium_drivers_cache[cache_key]
-            if cached_data.get("expires") > datetime.now():
-                return cached_data.get("data")
-
-        raw_response = await self.api_service.get_premium_driver_by_location(
-            city, page, limit, timestamp, preference
-        )
-
-        if not raw_response or not raw_response.get("success"):
-            print("API call failed or returned unsuccessful.")
-            return []
-
-        raw_driver_list = raw_response.get("data", [])
-
+        radius: int = 100,
+        search_strategy: str = "hybrid",
+        sort_by: str = "lastAccess:desc",
+        vehicle_types: Optional[List[str]] = None,
+        gender: Optional[str] = None,
+        min_age: Optional[int] = None,
+        max_age: Optional[int] = None,
+        is_pet_allowed: Optional[bool] = None,
+        min_connections: Optional[int] = None,
+        min_experience: Optional[int] = None,
+        languages: Optional[List[str]] = None,
+        profile_verified: Optional[bool] = None,
+        married: Optional[bool] = None,
+        custom_filters: Optional[Dict[str, Any]] = None,
+        use_cache: bool = True,
+    ) -> Dict[str, Union[str, bool, List[DriverModel], int]]:
         try:
-            parsed_drivers = [
-                Premium_driver_model.model_validate(driver_data)
-                for driver_data in raw_driver_list
-            ]
+            # Call API with parameters
+            result = await self.api_client.get_drivers(
+                city=city,
+                page=page,
+                limit=limit,
+                radius=radius,
+                search_strategy=search_strategy,
+                sort_by=sort_by,
+                vehicle_types=vehicle_types,
+                gender=gender,
+                min_age=min_age,
+                max_age=max_age,
+                is_pet_allowed=is_pet_allowed,
+                min_connections=min_connections,
+                min_experience=min_experience,
+                languages=languages,
+                profile_verified=profile_verified,
+                married=married,
+                custom_filters=custom_filters,
+                use_cache=use_cache,
+            )
+            if not result.success:
+                return {
+                    "success": False,
+                    "error": result.get("message", "Failed to fetch drivers"),
+                }
 
-            # Store parsed drivers in cache
-            self._premium_drivers_cache[cache_key] = {
-                "data": parsed_drivers,
-                "expires": datetime.now() + timedelta(minutes=5),
+            drivers: List[DriverModel] = result.data
+
+            # print("DRIVERS SEARCHED: \n", drivers, "\n")
+
+            return {
+                "success": True,
+                "drivers": drivers,
+                "count": len(drivers),
+                "total": result.pagination.total,
+                "filters": result.search.filters,
+                "has_more": result.pagination.has_more,
+                "page": page,
             }
 
-            # Create async task to fetch detailed driver data
-            asyncio.create_task(
-                self._fetch_and_cache_driver_detail(parsed_drivers, city)
+        except Exception as e:
+            logger.error(f"Error searching drivers: {str(e)}")
+            return {
+                "success": False,
+                "msg": "Failed to search drivers for your city, try again later",
+                "error": str(e),
+            }
+
+    @tool(
+        description="""
+    Retrieves detailed information for a specific driver from cache. Optimized for quick
+    lookups when users want to know more about a particular driver:
+
+    **Primary Use Cases:**
+    - User clicks on a driver from search results
+    - Following up on a previously viewed driver
+    - Getting updated details for a known driver ID
+
+    **Required Information:**
+    - Driver ID (unique identifier)
+    - City and page (for efficient cache retrieval)
+
+    **Returns:**
+    - Complete driver profile including:
+      - Personal details (name, age, experience)
+      - Vehicle information and images
+      - Ratings and reviews
+      - Availability status
+      - Contact preferences
+      - Service options (pet-friendly, languages, etc.)
+
+    **Performance Notes:**
+    - Cache-based retrieval ensures instant response
+    - No API call needed if driver exists in cache
+    - Ideal for drill-down scenarios after initial search
+
+    **Example Usage:**
+    - "Show me more about driver DRV123456"
+    - "Get details for the third driver from the previous search"
+    - "What vehicles does driver DRV789012 have?"
+    """,
+        args_schema=DriverInfoInput,
+    )
+    async def get_driver_info_tool(
+        self, city: str, page: int, driverId: str
+    ) -> Dict[str, DriverModel]:
+        try:
+            driver: DriverModel = await self.api_client._get_driver_detail(
+                self.api_client._generate_cache_key(city=city, page=page),
+                driverId=driverId,
+            )
+            return {"success": True, "driver": driver}
+        except Exception as e:
+            return {
+                "success": False,
+                "msg": "Failed to get Driver Information",
+                "error": e,
+            }
+
+    @tool(
+        description="""
+    Retrieves drivers from cache based on user-specified filter criteria. This tool provides
+    intelligent driver matching with fallback mechanisms:
+
+    **Primary Function:**
+    - Searches cached driver data for matches based on multiple filter criteria
+    - Supports complex filtering including vehicle types, demographics, experience, and availability
+
+    **Smart Fallback Logic:**
+    - If fewer than 5 drivers match the criteria, automatically triggers a fresh API search
+    - api search will be done again by `search_drivers` tool with next `page` value
+    - Ensures users always get sufficient options while leveraging cache for performance
+
+    **Filter Capabilities:**
+    - Vehicle type matching (supports multiple types with OR logic)
+    - Demographic filters (age range, gender, marital status)
+    - Service preferences (pet-friendly, handicapped assistance, event availability)
+    - Professional criteria (experience, connections, verification status)
+
+    **Use Cases:**
+    - "Find female drivers in Delhi who allow pets"
+    - "Get experienced drivers with sedan or SUV in Mumbai"
+    - "Show verified drivers available for wedding events"
+
+    **Performance Note:**
+    Cache-first approach ensures fast response times for common queries while
+    maintaining result quality through automatic API fallback when needed.
+    """,
+        args_schema=FilterDriverInput,
+    )
+    async def get_drivers_with_user_filter_via_cache_tool(
+        self, city: str, page: int, filter_obj: Dict[str, Any]
+    ) -> Dict[str, Union[List[DriverModel], int]]:
+        try:
+            ALLOWED_FILTER_KEYS = {
+                "vehicle_types",
+                "gender",
+                "min_age",
+                "max_age",
+                "is_pet_allowed",
+                "min_connections",
+                "min_experience",
+                "languages",
+                "profile_verified",
+                "married",
+                "allow_handicapped_persons",
+                "available_for_customers_personal_car",
+                "available_for_driving_in_event_wedding",
+                "available_for_part_time_full_time",
+            }
+
+            raw_drivers_response: APIResponse = await self.api_client._get_from_cache(
+                self.api_client._generate_cache_key(city=city, page=page)
             )
 
-            return parsed_drivers
+            raw_drivers: List[DriverModel] = raw_drivers_response.data
 
+            # print("this is raw_drivers: \n", raw_drivers, "\n")
+
+            valid_filter_obj = {
+                k: v for k, v in filter_obj.items() if k in ALLOWED_FILTER_KEYS
+            }
+
+            print("\nValid filter -> ", valid_filter_obj, "\n")
+            print("\nValid filter keys, values -> ", valid_filter_obj.items(), "\n")
+
+            def matches_filter(driver: DriverModel, key: str, value: Any) -> bool:
+                if key == "vehicle_types":
+                    driver_vehicle_types = [
+                        vehicle.vehicle_type for vehicle in driver.verified_vehicles
+                    ]
+                    if isinstance(value, list):
+                        return any(vtype in driver_vehicle_types for vtype in value)
+                    else:
+                        return value in driver_vehicle_types
+
+                # Handleer for  min/max filters
+                if key.startswith("min_"):
+                    attr_name = key[4:]
+                    driver_value = getattr(driver, attr_name, None)
+                    return driver_value is not None and driver_value >= value
+
+                elif key.startswith("max_"):
+                    attr_name = key[4:]
+                    driver_value = getattr(driver, attr_name, None)
+                    return driver_value is not None and driver_value <= value
+
+                else:
+                    driver_value = getattr(driver, key, None)
+                    return driver_value == value
+
+            filtered_drivers = [
+                driver
+                for driver in raw_drivers
+                if all(
+                    matches_filter(driver, k, v) for k, v in valid_filter_obj.items()
+                )
+            ]
+
+            validated_drivers: List[DriverModel] = [
+                DriverModel.model_validate(driver) for driver in filtered_drivers
+            ]
+            return {
+                "success": True,
+                "filtered_drivers": validated_drivers,
+                "total": len(validated_drivers),
+            }
         except Exception as e:
-            print(f"Bazinga! A validation error occurred: {e}")
-            return []
+            return {
+                "success": False,
+                "msg": "Failed to apply the filter, Plese cloose appropiate filters",
+                "error": e,
+            }
 
-    async def _fetch_and_cache_driver_detail(
-        self, premium_drivers: List[Premium_driver_model], city: str
-    ):
-        tasks = []
-        # Create a mapping of driver_id to premium driver for easy lookup
-        driver_map = {driver.id: driver for driver in premium_drivers}
+    @tool(
+        description="""
+    Retrieves drivers from cache when User asks to book ride with
+    the driver. This tool provides is used when user asks for ride
+    with a specific driver
 
-        for driver in premium_drivers:
-            tasks.append(self.api_service.get_partner_data(driver.id, int(time.time())))
+    **Primary Function:**
+    - Get's the driver user asked to book ride with.
+    - Give user Driver's Name, Profile url and contact number
 
-        # Wait for all API responses
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+    **Smart Fallback Logic:**
+    - If user asks for Driver who is not in the List or some issue occures,
+        Simply return user that there is some error finding that driver,
+        and tell user he can choose another driver
 
-        valid_drivers: List[Driver_Model] = []
+    **Use Cases:**
+    - "Book my ride with Ramesh"
+    - "Confirm booking with Suresh"
+    - "Book him for me ( here model will get the driver in context\
+            and choose that driver and show his Info) "
 
-        for res in results:
-            if isinstance(res, Exception):
-                print("Error in fetching driver:", res)
-                continue
+    **Performance Note:**
+    Cache-first approach ensures fast response times for common queries while
+    """,
+        args_schema=BookDriverInput,
+    )
+    async def book_or_confirm_ride_with_driver(
+        self, city: str, page: int, driverId: str
+    ) -> Dict[str, Union[bool, str]]:
+        try:
+            driver: DriverModel = await self.api_client._get_driver_detail(
+                self.api_client._generate_cache_key(city=city, page=page),
+                driverId=driverId,
+            )
 
-            try:
-                if not res or not res.get("success"):
-                    print("Invalid response:", res)
-                    continue
-
-                driver_data = res.get("data", {})
-                driver_uid = driver_data.get("uid")
-
-                # Find the corresponding premium driver info
-                existing_info = driver_map.get(driver_uid)
-
-                if not existing_info:
-                    print(f"No existing info found for driver {driver_uid}")
-                    continue
-
-                print("existing_info: \n", existing_info)
-
-                # Add existing_info to driver_data
-                driver_data["existing_info"] = existing_info
-
-                validated = Driver_Model.model_validate(driver_data)
-                valid_drivers.append(validated)
-            except Exception as e:
-                print("Validation error:", e)
-                print("Driver data:", driver_data)
-
-        self._drivers_cache[f"{self.user_session_id}_{city}"] = {
-            "data": valid_drivers,
-            "expires": datetime.now() + timedelta(minutes=5),
-        }
-
-    async def get_all_drivers_from_cache(
-        self, city: str
-    ) -> Optional[List[Driver_Model]]:
-        cache_key = f"{self.user_session_id}_{city}"
-
-        cache_entry = self._drivers_cache.get(cache_key)
-
-        if not cache_entry:
-            print("🚫 No cache found for city:", city)
-            return None
-
-        expires_at = cache_entry["expires"]
-        if expires_at < datetime.now():
-            print("⚠️ Cache expired for city:", city)
-            del self._drivers_cache[cache_key]  # Fixed typo
-            return None
-
-        print("✅ Cache hit for city:", city)
-        return cache_entry["data"]
-
-
-__all__ = ["DriverTools"]
+            return {
+                "success": True,
+                "Driver Name": driver.name,
+                "Profile": driver.profile_url,
+                "PhoneNo.": driver.phone_no,
+            }
+        except Exception as e:
+            return {"success": False, "msg": f"Failed to get the driver", "error": e}

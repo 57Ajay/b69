@@ -10,3 +10,7 @@ wheels/
 .venv
 
 .env
+
+typesense_schema.json
+
+api-docs.md

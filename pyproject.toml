@@ -14,4 +14,6 @@ dependencies = [
     "langgraph>=0.5.4",
     "langgraph-prebuilt>=0.5.2",
     "pydantic>=2.11.7",
+    "redis[hiredis]>=6.2.0",
+    "uvicorn>=0.35.0",
 ]
