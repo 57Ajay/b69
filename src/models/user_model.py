@@ -7,7 +7,8 @@ class UserModel(BaseModel):
     username: str
     name: str
     phone_no: str
-    preferred_languages: List[str]
+    profile_image: str
+    preferred_languages: List[str] = ["english"]
 
 
 __all__ = ["UserModel"]
