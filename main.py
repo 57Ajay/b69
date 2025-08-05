@@ -22,7 +22,6 @@ async def main():
     logger.info("Initializing services...")
 
     # Initialize the Language Model
-    # Using the model and temperature you specified.
     llm = ChatVertexAI(model="gemini-2.0-flash", temperature=0.5)
 
     # Initialize Redis Service for caching
@@ -41,20 +40,20 @@ async def main():
     app = create_agent_graph(llm, driver_tools)
 
     # --- 3. Run the CLI Chat Loop ---
-    print("\nCab Booking Agent is ready. Type 'exit' to end the conversation.")
-    print("-" * 50)
+    print("\n🚗 Cab Booking Agent is ready! Type 'exit' to end the conversation.")
+    print("=" * 60)
 
-    # CRITICAL FIX: Initialize with complete state structure
+    # CRITICAL FIX: Initialize with complete state structure including new fields
     conversation_state: AgentState = {
         "session_id": session_id,
         "messages": [],
         "user": UserModel(
-            id="6969",
-            username="69_love",
-            name="mr.69",
-            phone_no="69696969",
+            id="user123",
+            username="cab_user",
+            name="Cab User",
+            phone_no="1234567890",
             preferred_languages=["english"],
-            profile_image="69.com"
+            profile_image="default.jpg"
         ),
         # Pre-initialize ALL required state fields to prevent reset
         "last_user_message": "",
@@ -68,10 +67,14 @@ async def main():
         "use_cache": True,
         "active_filters": {},
         "previous_filters": [],
+        "is_filtered": False,  # NEW field
+        "total_filtered_results": 0,  # NEW field
         "current_drivers": [],
+        "all_drivers": [],  # NEW field to preserve original search results
         "total_results": 0,
         "has_more_results": False,
         "selected_driver": None,
+        "driver_summary": None,
         "booking_status": "none",
         "booking_details": None,
         "dropLocation": None,
@@ -87,31 +90,62 @@ async def main():
         "filter_relaxation_suggestions": None,
     }
 
+    print("💬 You can ask me to:")
+    print("  • Find drivers: 'book me a cab from delhi to jaipur'")
+    print("  • Get driver info: 'tell me about ramesh' or 'ramesh phone number'")
+    print("  • Apply filters: 'show me SUV drivers' or 'drivers with 5+ years experience'")
+    print("  • Book a ride: 'book with ramesh'")
+    print("-" * 60)
+
     while True:
-        user_input = input("You: ")
-        if user_input.lower() == 'exit':
-            print("Agent: Goodbye!")
-            break
-
-        # Append the new user message to the persistent state's history
-        conversation_state["messages"].append(HumanMessage(content=user_input))
-
         try:
+            user_input = input("\n👤 You: ").strip()
+            if user_input.lower() in ['exit', 'quit', 'bye']:
+                print("🚗 Agent: Thank you for using our cab booking service! Have a great day!")
+                break
+
+            if not user_input:
+                print("🚗 Agent: Please tell me what you'd like to do.")
+                continue
+
+            # Append the new user message to the persistent state's history
+            conversation_state["messages"].append(HumanMessage(content=user_input))
+
+            # Clear previous errors when starting new interaction
+            conversation_state["last_error"] = None
+
+            print("🚗 Agent: ", end="", flush=True)
+
             # CRITICAL: Invoke the graph with the COMPLETE conversation_state
             final_state = await app.ainvoke(conversation_state)
 
             # The final response is the last message added by the agent
-            response_message = final_state["messages"][-1]
-            print(f"Agent: {response_message.content}")
+            if final_state["messages"] and len(final_state["messages"]) > 0:
+                response_message = final_state["messages"][-1]
+                print(f"{response_message.content}")
+            else:
+                print("I'm processing your request...")
 
             # CRITICAL: Update our local state with the final state from the graph.
             # This ensures the agent remembers the conversation for the next turn.
             conversation_state = final_state
 
+            # Debug info (can be removed in production)
+            if conversation_state.get("search_city"):
+                drivers_count = len(conversation_state.get("current_drivers", []))
+                all_drivers_count = len(conversation_state.get("all_drivers", []))
+                filter_status = " (filtered)" if conversation_state.get("is_filtered", False) else ""
+                print(f"\n[Debug: {drivers_count}/{all_drivers_count} drivers available in {conversation_state['search_city']}{filter_status}]")
+
+        except KeyboardInterrupt:
+            print("\n\n🚗 Agent: Goodbye! Hope to help you again soon!")
+            break
         except Exception as e:
             logger.critical(f"An unhandled error occurred in the graph execution: {e}", exc_info=True)
-            print("Agent: I'm sorry, a critical error occurred. Please try restarting the conversation.")
-            break
+            print("\n🚗 Agent: I'm sorry, I encountered a technical issue. Let me try to help you again.")
+            # Reset error state but keep the conversation context
+            conversation_state["last_error"] = None
+            conversation_state["failed_node"] = None
 
 if __name__ == "__main__":
     try:

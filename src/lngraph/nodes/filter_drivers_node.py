@@ -54,12 +54,18 @@ class FilterDriversNode:
 
         user_message = state["last_user_message"]
 
-        if not state.get("search_city") or not state.get("current_drivers"):
+        if not state.get("search_city"):
             logger.warning("Filter intent detected without an active search.")
             return {
                 "last_error": "It looks like you want to filter, but we haven't searched for any drivers yet. Please tell me which city you're looking in first.",
                 "failed_node": "filter_drivers_node"
             }
+
+        # CRITICAL: Always use the original cache, not current filtered drivers
+        cache_key = self.driver_tools.api_client._generate_cache_key(
+            str(state["search_city"]),
+            state["current_page"]
+        )
 
         # 1. Extract filter criteria from the user's message
         extract_prompt = ChatPromptTemplate.from_messages([
@@ -81,8 +87,15 @@ class FilterDriversNode:
             logger.error(f"Error during filter extraction: {e}", exc_info=True)
             return {"last_error": "I had trouble understanding your filter criteria. Could you please rephrase?", "failed_node": "filter_drivers_node"}
 
-        # 2. Merge new filters with existing active filters
-        updated_filters = {**state.get("active_filters", {}), **extracted_filters}
+        # 2. CRITICAL: For cumulative filtering, merge with existing filters
+        # But for new filter types, replace the old value
+        current_filters = state.get("active_filters", {})
+        updated_filters = {**current_filters}
+
+        # Replace or add each new filter
+        for key, value in extracted_filters.items():
+            updated_filters[key] = value
+
         logger.info(f"Applying updated filters: {updated_filters}")
 
         # 3. Call the tool to apply filters to the cached results
@@ -96,10 +109,15 @@ class FilterDriversNode:
             if tool_response.get("success"):
                 filtered_drivers = tool_response.get("filtered_drivers", [])
                 logger.info(f"Successfully filtered drivers. Found {len(filtered_drivers)} matches.")
+
+                # CRITICAL: Don't lose the original drivers - keep them accessible
                 return {
                     "current_drivers": filtered_drivers,
                     "active_filters": updated_filters,
                     "last_error": None,
+                    # Keep track that we're in filtered mode
+                    "is_filtered": True,
+                    "total_filtered_results": len(filtered_drivers)
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while filtering.')

@@ -16,9 +16,11 @@ class DriverIdentifier(BaseModel):
     Pydantic model to extract how the user is identifying a driver.
     """
     driver_name: Optional[str] = Field(
+        default=None,
         description="The name of the driver the user is asking about, e.g., 'Ramesh'."
     )
     driver_index: Optional[int] = Field(
+        default=None,
         description="The 1-based index of the driver in the list, e.g., 'the first one' -> 1, 'the third driver' -> 3."
     )
 
@@ -37,6 +39,31 @@ class GetDriverInfoNode:
         """
         self.llm = llm
         self.driver_tools = driver_tools
+
+    def _find_driver_by_name(self, drivers, search_name):
+        """
+        Find driver by name with fuzzy matching.
+        """
+        search_name_lower = search_name.lower()
+
+        # First try exact match
+        for driver in drivers:
+            if driver.name.lower() == search_name_lower:
+                return driver
+
+        # Try partial match (driver name contains search term)
+        for driver in drivers:
+            if search_name_lower in driver.name.lower():
+                return driver
+
+        # Try reverse partial match (search term contains driver name parts)
+        for driver in drivers:
+            driver_name_parts = driver.name.lower().split()
+            for part in driver_name_parts:
+                if part in search_name_lower and len(part) > 2:  # Avoid matching very short words
+                    return driver
+
+        return None
 
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
@@ -60,12 +87,12 @@ class GetDriverInfoNode:
                 "failed_node": "get_driver_info_node"
             }
 
+        # CRITICAL: Always get ALL drivers from cache, not just filtered ones
         cache_key = self.driver_tools.api_client._generate_cache_key(
             str(state["search_city"]),
             state["current_page"]
         )
 
-        # Fix: Properly handle None response from cache
         try:
             cached_data = await self.driver_tools.api_client._get_from_cache(cache_key)
             if cached_data is None:
@@ -75,9 +102,9 @@ class GetDriverInfoNode:
                     "failed_node": "get_driver_info_node"
                 }
 
-            # Validate the cached data before accessing .data
+            # Get ALL drivers from cache, not just the filtered ones
             api_response = APIResponse.model_validate(cached_data)
-            current_drivers = api_response.data
+            all_drivers = api_response.data
 
         except Exception as e:
             logger.error(f"Error retrieving drivers from cache: {e}")
@@ -86,7 +113,7 @@ class GetDriverInfoNode:
                 "failed_node": "get_driver_info_node"
             }
 
-        if not current_drivers:
+        if not all_drivers:
             logger.warning("No drivers in cached data.")
             return {
                 "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
@@ -95,11 +122,11 @@ class GetDriverInfoNode:
 
         # 1. Extract which driver the user is asking about
         extract_prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an entity extraction expert. From the user's message, identify the driver they are asking about. They might use a name or an index (e.g., 'the first one', 'the second driver'). Extract either the name or the 1-based index."),
+            ("system", "You are an entity extraction expert. From the user's message, identify the driver they are asking about. They might use a name or an index (e.g., 'the first one', 'the second driver'). Extract either the name or the 1-based index. Return null for fields not mentioned."),
             ("human", "Available driver names: {driver_names}\n\nUser Message: {user_message}")
         ])
 
-        driver_names = [driver.name for driver in current_drivers]
+        driver_names = [driver.name for driver in all_drivers]
         extract_chain = extract_prompt | self.llm.with_structured_output(DriverIdentifier)
 
         try:
@@ -112,40 +139,61 @@ class GetDriverInfoNode:
             logger.error(f"Error during driver identification: {e}", exc_info=True)
             return {"last_error": "I'm sorry, I couldn't understand which driver you're asking about.", "failed_node": "get_driver_info_node"}
 
-        # 2. Find the driver's ID from the identifier
-        target_driver_id = None
+        # 2. Find the driver from the identifier
+        target_driver = None
+
         if identifier.driver_name:
-            for driver in current_drivers:
-                if driver.name.lower() == identifier.driver_name.lower():
-                    target_driver_id = driver.id
-                    break
-        elif identifier.driver_index and 0 < identifier.driver_index <= len(current_drivers):
-            target_driver_id = current_drivers[identifier.driver_index - 1].id
+            target_driver = self._find_driver_by_name(all_drivers, identifier.driver_name)
+        elif identifier.driver_index and 0 < identifier.driver_index <= len(all_drivers):
+            target_driver = all_drivers[identifier.driver_index - 1]
 
-        if not target_driver_id:
+        # Fallback: If no identifier extracted, try to find from the current selected driver
+        if not target_driver and state.get("selected_driver"):
+            target_driver = state["selected_driver"]
+
+        if not target_driver:
             logger.warning(f"Could not find a matching driver for identifier: {identifier.model_dump_json()}")
-            return {"last_error": "I couldn't find that specific driver in the current list. Please try again.", "failed_node": "get_driver_info_node"}
+            available_names = ", ".join([driver.name for driver in all_drivers[:5]])  # Show first 5 names
+            return {
+                "last_error": f"I couldn't find that specific driver. Available drivers include: {available_names}. Please try again.",
+                "failed_node": "get_driver_info_node"
+            }
 
-        logger.info(f"Fetching details for driver ID: {target_driver_id}")
+        logger.info(f"Found driver details for: {target_driver.name}")
 
-        # 3. Call the tool to get driver details
+        # 3. Return the complete driver information
         try:
-            tool_response = await self.driver_tools.get_driver_info_tool.ainvoke({
-                "city": state["search_city"],
-                "page": state["current_page"],
-                "driverId": target_driver_id,
-            })
+            # Extract vehicle information
+            vehicle_info = []
+            total_cost_per_km = 0
+            for vehicle in target_driver.verified_vehicles:
+                vehicle_detail = f"{vehicle.vehicle_type}"
+                if hasattr(vehicle, 'model') and vehicle.model:
+                    vehicle_detail += f" ({vehicle.model})"
+                vehicle_info.append(vehicle_detail)
+                total_cost_per_km += vehicle.per_km_cost
 
-            if tool_response.get("success"):
-                logger.info(f"Successfully fetched details for driver {target_driver_id}.")
-                return {
-                    "selected_driver": tool_response.get("driver"),
-                    "last_error": None,
-                }
-            else:
-                error_msg = tool_response.get('error', 'An unknown error occurred.')
-                logger.error(f"Get driver info tool failed: {error_msg}")
-                return {"last_error": tool_response.get("msg", error_msg), "failed_node": "get_driver_info_node"}
+            avg_cost_per_km = total_cost_per_km / len(target_driver.verified_vehicles) if target_driver.verified_vehicles else 0
+
+            driver_summary = {
+                "name": target_driver.name,
+                "age": target_driver.age if target_driver.age > 0 else "Not specified",
+                "city": target_driver.city,
+                "experience": target_driver.experience,
+                "vehicles": vehicle_info,
+                "avg_cost_per_km": round(avg_cost_per_km, 2),
+                "phone": target_driver.phone_no,
+                "profile_url": target_driver.constructed_profile_url,
+                "languages": target_driver.verified_languages,
+                "pet_allowed": target_driver.is_pet_allowed,
+                "connections": target_driver.connections
+            }
+
+            return {
+                "selected_driver": target_driver,
+                "driver_summary": driver_summary,
+                "last_error": None,
+            }
         except Exception as e:
             logger.critical(f"A critical error occurred in GetDriverInfoNode: {e}", exc_info=True)
             return {"last_error": "A system error occurred while fetching driver details.", "failed_node": "get_driver_info_node"}

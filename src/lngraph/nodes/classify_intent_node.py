@@ -14,7 +14,8 @@ IntentType = Literal[
     "driver_info_intent",
     "booking_or_confirmation_intent",
     "filter_intent",
-    "general_intent"
+    "general_intent",
+    "more_driver_intent"
 ]
 
 class Intent(BaseModel):
@@ -28,7 +29,8 @@ class Intent(BaseModel):
         "driver_info_intent",
         "booking_or_confirmation_intent",
         "filter_intent",
-        "general_intent"
+        "general_intent",
+        "more_driver_intent",
         """)
 
 class ClassifyIntentNode:

@@ -75,7 +75,6 @@ class SearchDriversNode:
         # 2. Check if we have a city to search for
         if not city:
             logger.warning("No city found in message or state. Asking user for clarification.")
-            # This will be routed to a response generator to ask the user for a city.
             return {"last_error": "I need to know which city you're looking for a cab in. Please specify the city.", "failed_node": "search_drivers_node"}
 
         logger.info(f"Performing driver search in city: {city}")
@@ -89,14 +88,23 @@ class SearchDriversNode:
             })
 
             if tool_response.get("success"):
-                driver_count = tool_response.get('count', 0)
+                drivers = tool_response.get("drivers", [])
+                driver_count = len(drivers)
+
                 logger.info(f"Successfully found {driver_count} drivers.")
+
+                # CRITICAL: Store both current and all drivers
                 return {
                     "search_city": city,
-                    "current_drivers": tool_response.get("drivers", []),
+                    "current_drivers": drivers,  # Currently displayed drivers
+                    "all_drivers": drivers,      # ALL drivers (preserved for filtering)
                     "total_results": tool_response.get("total", 0),
                     "has_more_results": tool_response.get("has_more", False),
-                    "last_error": None, # Clear previous errors on success
+                    "last_error": None,  # Clear previous errors on success
+                    "is_filtered": False,  # Reset filter status on new search
+                    "active_filters": {},  # Clear filters on new search
+                    "selected_driver": None,  # Clear selected driver on new search
+                    "driver_summary": None,  # Clear driver summary on new search
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while searching.')
@@ -104,7 +112,8 @@ class SearchDriversNode:
                 return {
                     "last_error": tool_response.get("msg", error_msg),
                     "failed_node": "search_drivers_node",
-                    "current_drivers": [], # Clear drivers on failure
+                    "current_drivers": [],  # Clear drivers on failure
+                    "all_drivers": [],     # Clear all drivers on failure
                 }
         except Exception as e:
             logger.critical(f"A critical error occurred in SearchDriversNode: {e}", exc_info=True)
@@ -112,4 +121,5 @@ class SearchDriversNode:
                 "last_error": "A system error occurred. Please try again later.",
                 "failed_node": "search_drivers_node",
                 "current_drivers": [],
+                "all_drivers": [],
             }

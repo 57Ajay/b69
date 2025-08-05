@@ -72,8 +72,13 @@ class TripInfoCollectionNode:
             - trip_type: "one-way", "round-trip", or "multi-city" - only if mentioned
             - trip_duration: Number of days for round-trip or multi-city - only if mentioned
 
-            If no information is found for a field, return null for that field.
-            Example: If user says "book me a cab", return all fields as null since no specific trip details are mentioned."""),
+            Examples:
+            - "book me a cab from delhi to mumbai" -> pickup: "delhi", drop: "mumbai", type: "one-way"
+            - "I need a round trip for 3 days" -> trip_type: "round-trip", duration: 3
+            - "from airport to hotel" -> pickup: "airport", drop: "hotel"
+            - "delhi" -> pickup: "delhi" (assuming it's pickup location)
+
+            If no information is found for a field, return null for that field."""),
             ("human", "User Message: {user_message}")
         ])
 
@@ -89,6 +94,10 @@ class TripInfoCollectionNode:
             updated_trip_type = trip_info.trip_type if trip_info.trip_type else existing_trip_type
             updated_duration = trip_info.trip_duration if trip_info.trip_duration else existing_duration
 
+            # Special case: If user just mentions a single city, treat it as pickup
+            if not updated_pickup and not updated_drop and trip_info.pickup_location:
+                updated_pickup = trip_info.pickup_location
+
         except Exception as e:
             logger.error(f"Error during trip info extraction: {e}", exc_info=True)
             # Use existing values if extraction fails
@@ -100,9 +109,9 @@ class TripInfoCollectionNode:
         # Check what's still missing
         missing_info = []
         if not updated_pickup:
-            missing_info.append("pickup location (where should we pick you up?)")
+            missing_info.append("pickup location")
         if not updated_drop:
-            missing_info.append("destination (where are you going?)")
+            missing_info.append("destination")
         if updated_trip_type == "round-trip" and not updated_duration:
             missing_info.append("trip duration (how many days?)")
 
@@ -114,28 +123,31 @@ class TripInfoCollectionNode:
             (updated_trip_type != "round-trip" or updated_duration)
         )
 
+        update_dict = {
+            "pickupLocation": updated_pickup,
+            "dropLocation": updated_drop,
+            "trip_type": updated_trip_type,
+            "trip_duration": updated_duration,
+            "full_trip_details": has_complete_info,
+        }
+
         if has_complete_info:
             logger.info("Complete trip information collected")
-            return {
-                "pickupLocation": updated_pickup,
-                "dropLocation": updated_drop,
-                "trip_type": updated_trip_type,
-                "trip_duration": updated_duration,
-                "full_trip_details": True,
+            update_dict.update({
                 "search_city": updated_pickup,  # Use pickup location as search city
                 "last_error": None
-            }
+            })
         else:
             logger.info(f"Missing trip information: {missing_info}")
-            # Generate a helpful prompt for missing information
-            missing_prompt = f"I need some more details about your trip. Please provide: {', '.join(missing_info)}"
+            # Create a helpful prompt for missing information
+            if len(missing_info) == 1:
+                missing_prompt = f"I need to know your {missing_info[0]}. Could you please provide it?"
+            else:
+                missing_prompt = f"I need a few more details: {', '.join(missing_info[:-1])} and {missing_info[-1]}."
 
-            return {
-                "pickupLocation": updated_pickup,
-                "dropLocation": updated_drop,
-                "trip_type": updated_trip_type,
-                "trip_duration": updated_duration,
-                "full_trip_details": False,
+            update_dict.update({
                 "last_error": missing_prompt,
                 "failed_node": "trip_info_collection"
-            }
+            })
+
+        return update_dict

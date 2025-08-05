@@ -23,10 +23,13 @@ class GraphState(TypedDict):
 
 def route_after_intent_classification(state: AgentState):
     """
-    CRITICAL: Enhanced router with strict state validation to prevent fake data generation.
+    CRITICAL: Enhanced router with strict state validation and proper flow control.
     """
     intent = state.get("intent")
-    print(f"DEBUG: Routing intent '{intent}' with search_city: {state.get('search_city')}")
+    search_city = state.get("search_city")
+    current_drivers = state.get("current_drivers", [])
+
+    print(f"DEBUG: Routing intent '{intent}' with search_city: {search_city}, drivers: {len(current_drivers)}")
 
     # Check if we have essential trip information for booking-related intents
     has_complete_trip_info = (
@@ -36,38 +39,56 @@ def route_after_intent_classification(state: AgentState):
         (state.get("trip_type") != "round-trip" or state.get("trip_duration"))
     )
 
-    # For booking intent - STRICT validation
+    # For general intents - just generate a response
+    if intent == "general_intent":
+        return "generate_response"
+
+    # For booking intent - STRICT validation and proper flow
     if intent == "booking_or_confirmation_intent":
         if not has_complete_trip_info:
-            print("DEBUG: Missing trip info for booking, routing to collect_trip_info")
+            print("DEBUG: Missing trip info for booking, collecting trip info")
             return "collect_trip_info"
-        if not state.get("search_city") or not state.get("current_drivers"):
-            print("DEBUG: No drivers available for booking, routing to search_drivers")
+        if not search_city or not current_drivers:
+            print("DEBUG: No drivers available for booking, need to search first")
             return "search_drivers"
         return "book_driver"
 
-    # For driver search - collect trip info first if missing
+    # For driver search - collect trip info first if missing, then search
     if intent == "driver_search_intent":
         if not has_complete_trip_info:
-            print("DEBUG: Missing trip info for search, routing to collect_trip_info")
+            print("DEBUG: Missing trip info for search, collecting trip info")
             return "collect_trip_info"
         return "search_drivers"
 
-    # CRITICAL: For driver info and filter intents, MUST have existing drivers
+    # CRITICAL: For driver info intent, MUST have existing drivers
     if intent == "driver_info_intent":
-        if not state.get("search_city") or not state.get("current_drivers"):
-            print("DEBUG: No drivers available for info request, routing to generate_response")
+        if not search_city or not current_drivers:
+            print("DEBUG: No drivers available for info request, asking to search first")
             return "generate_response"  # Will ask user to search first
         return "get_driver_info"
 
+    # For filter intent, MUST have existing drivers
     if intent == "filter_intent":
-        if not state.get("search_city") or not state.get("current_drivers"):
-            print("DEBUG: No drivers available for filtering, routing to generate_response")
+        if not search_city or not current_drivers:
+            print("DEBUG: No drivers available for filtering, asking to search first")
             return "generate_response"  # Will ask user to search first
         return "filter_drivers"
 
     # Default case
     return "generate_response"
+
+def route_after_trip_collection(state: AgentState):
+    """
+    Router to determine next step after trip info collection.
+    """
+    has_complete_trip_info = state.get("full_trip_details", False)
+
+    if has_complete_trip_info:
+        print("DEBUG: Trip info complete, proceeding to search drivers")
+        return "search_drivers"
+    else:
+        print("DEBUG: Trip info incomplete, generating response to ask for missing info")
+        return "generate_response"
 
 def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools):
     """
@@ -119,8 +140,15 @@ def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools):
         }
     )
 
-    # 4. After collecting trip info, search for drivers
-    workflow.add_edge("collect_trip_info", "search_drivers")
+    # 4. After collecting trip info, check if complete
+    workflow.add_conditional_edges(
+        "collect_trip_info",
+        route_after_trip_collection,
+        {
+            "search_drivers": "search_drivers",
+            "generate_response": "generate_response"
+        }
+    )
 
     # 5. After tool-executing nodes, generate a response
     workflow.add_edge("search_drivers", "generate_response")
