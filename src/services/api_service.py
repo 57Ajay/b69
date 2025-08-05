@@ -1,5 +1,5 @@
 import httpx
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, timedelta
 import logging
 from src.models.drivers_model import DriverModel, APIResponse
@@ -14,7 +14,7 @@ class DriversAPIClient:
         self.base_url = "https://us-central1-cabswale-ai.cloudfunctions.net"
         self.endpoint = "/cabbot-botApiGetPremiumDrivers"
         self.client = httpx.AsyncClient(timeout=30.0)
-        self._cache = {}  # Simple in-memory cache for now
+        self._cache: Dict[str, Dict[str, Any]] = {}
         self.cache_duration = timedelta(minutes=cache_duration_minutes)
         self.session_id = session_id
 
@@ -22,15 +22,15 @@ class DriversAPIClient:
         """Generate a cache key from parameters"""
         return f"{self.session_id}_{city}_{page}"
 
-    async def _get_from_cache(self, cache_key: str) -> APIResponse:
+    async def _get_from_cache(self, cache_key: str) -> Union[APIResponse, None]:
         """Get data from cache if not expired"""
         # print("\ngetting from cache.....\n")
 
         if cache_key in self._cache:
-            cached_data = self._cache.get(cache_key)
-            if cached_data.get("expires") > datetime.now():
+            cached_data: Dict[str, Any] = self._cache.get(cache_key) or {}
+            if cached_data.get("expires", 0) > datetime.now():
                 logger.info(f"Cache hit for key: {cache_key}")
-                return cached_data.get("data")
+                return APIResponse.model_validate(cached_data.get("data"))
             else:
                 del self._cache[cache_key]
         return None
@@ -46,12 +46,62 @@ class DriversAPIClient:
 
     async def _get_driver_detail(self, cache_key: str, driverId: str) -> DriverModel:
         drivers_from_cache = await self._get_from_cache(cache_key)
-        driver_data: DriverModel = {}
-        for driver in drivers_from_cache.data:
+        driver_data: DriverModel = DriverModel(**{})
+        for driver in APIResponse.model_validate(drivers_from_cache).data :
             if driverId == driver.id:
                 driver_data: DriverModel = DriverModel.model_validate(driver)
                 break
         return driver_data
+
+
+    def _build_driver_filters(
+        self,
+        vehicle_types: Optional[List[str]],
+        gender: Optional[str],
+        min_age: Optional[int],
+        max_age: Optional[int],
+        is_pet_allowed: Optional[bool],
+        min_connections: Optional[int],
+        min_experience: Optional[int],
+        languages: Optional[List[str]],
+        profile_verified: Optional[bool],
+        married: Optional[bool],
+        custom_filters: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        filters: Dict[str, Any] = {}
+        print("building filters")
+
+        optional_list_filters = {
+            "vehicleTypes": vehicle_types,
+            "verifiedLanguages": languages,
+        }
+
+        for key, val in optional_list_filters.items():
+            if val:
+                filters[key] = ",".join(val)
+
+        optional_simple_filters = {
+            "gender": gender,
+            "minAge": min_age,
+            "maxAge": max_age,
+            "minConnections": min_connections,
+            "minExperience": min_experience,
+            "profileVerified": profile_verified,
+            "married": married,
+        }
+
+        for key, val in optional_simple_filters.items():
+            if val is not None:
+                filters[key] = val
+
+        if is_pet_allowed is not None:
+            filters["isPetAllowed"] = str(is_pet_allowed).lower()
+
+        if custom_filters:
+            filters.update(custom_filters)
+
+        return filters
+
 
     async def get_drivers(
         self,
@@ -73,7 +123,7 @@ class DriversAPIClient:
         custom_filters: Optional[Dict[str, Any]] = None,
         married: Optional[bool] = None,
         use_cache: bool = True,
-    ) -> APIResponse:
+    ) -> Dict[str, Union[str, int, bool, APIResponse]]:
         """
         Fetch premium drivers with various filters
 
@@ -110,59 +160,49 @@ class DriversAPIClient:
         }
 
         # Add optional filters
-        if vehicle_types:
-            params["vehicleTypes"] = ",".join(vehicle_types)
-        if gender:
-            params["gender"] = gender
-        if min_age is not None:
-            params["minAge"] = min_age
-        if max_age is not None:
-            params["maxAge"] = max_age
-        if is_pet_allowed is not None:
-            params["isPetAllowed"] = str(is_pet_allowed).lower()
-        if min_connections is not None:
-            params["minConnections"] = min_connections
-        if min_experience is not None:
-            params["minExperience"] = min_experience
-        if languages:
-            params["verifiedLanguages"] = ",".join(languages)
-        if profile_verified is not None:
-            params["profileVerified"] = profile_verified
-        if married:
-            params["married"] = married
+        filters = self._build_driver_filters(
+                vehicle_types=vehicle_types,
+                gender=gender,
+                min_age=min_age,
+                max_age=max_age,
+                is_pet_allowed=is_pet_allowed,
+                min_connections=min_connections,
+                min_experience=min_experience,
+                languages=languages,
+                profile_verified=profile_verified,
+                married=married,
+                custom_filters=custom_filters,
+            )
+        params.update(filters)
+        print("Filters applied -> \n", filters)
 
-        # Add any custom filters
-        if custom_filters:
-            params.update(custom_filters)
-
-        # Check cache first
         if use_cache:
             cache_key = self._generate_cache_key(city, page)
             cached_data = await self._get_from_cache(cache_key)
             if cached_data:
-                return cached_data
+                return { "success": True, "data": cached_data }
 
         try:
-            # Make API request
             url = f"{self.base_url}{self.endpoint}"
             logger.info(
                 f"Fetching premium drivers from: {url}\
                     with params: {params}"
             )
-            print("Calling api with params -> \n", params)
+            # print("Calling api with params -> \n", params)
 
             response = await self.client.get(url, params=params)
             response.raise_for_status()
+            # print("Response received")
 
             data: APIResponse = APIResponse.model_validate(response.json())
             # print("\nGOT DATA\n", data)
+            # print("IT IS DONE AND OK")
 
             # Cache successful response
             if use_cache and data.success:
                 cache_key = self._generate_cache_key(city, page)
                 self._save_to_cache(cache_key, data)
-
-            return data
+            return { "success": True, "data": data }
 
         except httpx.HTTPStatusError as e:
             logger.error(

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class DriverTools:
-    """Simple tools for driver operations"""
+    """Tools for driver operations"""
 
     def __init__(self, api_client: DriversAPIClient):
         """
@@ -88,7 +88,7 @@ class DriverTools:
         married: Optional[bool] = None,
         custom_filters: Optional[Dict[str, Any]] = None,
         use_cache: bool = True,
-    ) -> Dict[str, Union[str, bool, List[DriverModel], int]]:
+    ) -> Dict[str, Union[str, bool, List[DriverModel], int, Dict[str, Any]]]:
         try:
             # Call API with parameters
             result = await self.api_client.get_drivers(
@@ -111,13 +111,14 @@ class DriverTools:
                 custom_filters=custom_filters,
                 use_cache=use_cache,
             )
-            if not result.success:
+            if not result.get("success", False):
                 return {
                     "success": False,
-                    "error": result.get("message", "Failed to fetch drivers"),
+                    "error": str(result.get("message", "Failed to get drivers")),
                 }
 
-            drivers: List[DriverModel] = result.data
+            drivers = APIResponse.model_validate(result.get("data")).data
+            # drivers: List[DriverModel] = [DriverModel.model_validate(driver) for driver in drivers]
 
             # print("DRIVERS SEARCHED: \n", drivers, "\n")
 
@@ -125,9 +126,9 @@ class DriverTools:
                 "success": True,
                 "drivers": drivers,
                 "count": len(drivers),
-                "total": result.pagination.total,
-                "filters": result.search.filters,
-                "has_more": result.pagination.has_more,
+                "total": APIResponse.model_validate(result.get("data")).pagination.total,
+                "filters": APIResponse.model_validate(result.get("data")).search.filters,
+                "has_more": APIResponse.model_validate(result.get("data")).pagination.has_more,
                 "page": page,
             }
 
@@ -176,7 +177,7 @@ class DriverTools:
     )
     async def get_driver_info_tool(
         self, city: str, page: int, driverId: str
-    ) -> Dict[str, DriverModel]:
+    ) -> Dict[str, Union[DriverModel, bool, str, Exception]]:
         try:
             driver: DriverModel = await self.api_client._get_driver_detail(
                 self.api_client._generate_cache_key(city=city, page=page),
@@ -223,7 +224,7 @@ class DriverTools:
     )
     async def get_drivers_with_user_filter_via_cache_tool(
         self, city: str, page: int, filter_obj: Dict[str, Any]
-    ) -> Dict[str, Union[List[DriverModel], int]]:
+    ) -> Dict[str, Union[List[DriverModel], int, str, Exception]]:
         try:
             ALLOWED_FILTER_KEYS = {
                 "vehicle_types",
@@ -242,11 +243,13 @@ class DriverTools:
                 "available_for_part_time_full_time",
             }
 
-            raw_drivers_response: APIResponse = await self.api_client._get_from_cache(
+            raw_drivers_response = await self.api_client._get_from_cache(
                 self.api_client._generate_cache_key(city=city, page=page)
             )
+            if raw_drivers_response is None:
+                return {"success": False, "msg": "No drivers found"}
 
-            raw_drivers: List[DriverModel] = raw_drivers_response.data
+            raw_drivers: List[DriverModel] = APIResponse.model_validate(raw_drivers_response).data
 
             # print("this is raw_drivers: \n", raw_drivers, "\n")
 
@@ -254,8 +257,8 @@ class DriverTools:
                 k: v for k, v in filter_obj.items() if k in ALLOWED_FILTER_KEYS
             }
 
-            print("\nValid filter -> ", valid_filter_obj, "\n")
-            print("\nValid filter keys, values -> ", valid_filter_obj.items(), "\n")
+            # print("\nValid filter -> ", valid_filter_obj, "\n")
+            # print("\nValid filter keys, values -> ", valid_filter_obj.items(), "\n")
 
             def matches_filter(driver: DriverModel, key: str, value: Any) -> bool:
                 if key == "vehicle_types":
@@ -333,7 +336,7 @@ class DriverTools:
     )
     async def book_or_confirm_ride_with_driver(
         self, city: str, page: int, driverId: str
-    ) -> Dict[str, Union[bool, str]]:
+    ) -> Dict[str, Union[bool, str, Exception]]:
         try:
             driver: DriverModel = await self.api_client._get_driver_detail(
                 self.api_client._generate_cache_key(city=city, page=page),
@@ -347,4 +350,4 @@ class DriverTools:
                 "PhoneNo.": driver.phone_no,
             }
         except Exception as e:
-            return {"success": False, "msg": f"Failed to get the driver", "error": e}
+            return {"success": False, "msg": "Failed to get the driver", "error": e}

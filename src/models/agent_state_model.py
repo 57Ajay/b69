@@ -1,4 +1,4 @@
-from typing import TypedDict, Optional, Any, List, Dict
+from typing import Optional, Any, List, Dict, TypedDict
 from langchain_core.messages import BaseMessage
 from src.models.drivers_model import DriverModel
 from src.models.user_model import UserModel
@@ -13,7 +13,9 @@ class AgentState(TypedDict):
     # Conversation State
     messages: List[BaseMessage]
     last_user_message: str
-    conversation_language: str  # Auto-detected/switched language
+    conversation_language: str
+    # Added: "waiting_for_input", "ended", etc.
+    conversation_state: Optional[str]
 
     # Search Context
     pickup_city: Optional[str]
@@ -33,12 +35,16 @@ class AgentState(TypedDict):
     driver_history: List[str]  # Driver IDs user has viewed
 
     # Booking Context
-    booking_status: str  # "none", "in_progress", "confirmed"
+    # "none", "in_progress", "confirmed", "pending_info", "failed", "error", "completed"
+    booking_status: str
     booking_details: Optional[Dict[str, Any]]
+    booking_reference: Optional[Dict[str, Any]]  # Added
 
     # Error Handling
     last_error: Optional[str]
     retry_count: int
+    error_history: Optional[List[Dict[str, Any]]]  # Added
+    failed_node: Optional[str]  # Added
 
     # Cache Keys
     cache_keys_used: List[str]  # For efficient cache management
@@ -46,3 +52,35 @@ class AgentState(TypedDict):
     # User Preferences (learned over time)
     # Frequently used filters, preferred vehicles
     user_preferences: Dict[str, Any]
+
+    # Flow Control - Added fields
+    # "search", "filter", "driver_info", "booking", "general_query", "more_results"
+    intent: Optional[str]
+    next_node: Optional[str]  # Next node to route to
+    awaiting_user_input: bool  # Added
+
+    # Additional Context - Added fields
+    timestamp: Optional[str]
+    created_at: Optional[str]
+    last_updated: Optional[str]
+    state_version: Optional[str]
+
+    # Recovery and Manual Mode - Added fields
+    last_stable_state: Optional[Dict[str, Any]]
+    manual_mode: Optional[bool]
+
+    # Suggestions and Options - Added fields
+    no_results_suggestions: Optional[List[Dict[str, Any]]]
+    suggested_cities: Optional[List[Dict[str, Any]]]
+    nearby_city_suggestions: Optional[Dict[str, List[Dict[str, Any]]]]
+    suggestion_context: Optional[str]
+    quick_city_options: Optional[List[Dict[str, Any]]]
+    filter_relaxation_suggestions: Optional[List[Dict[str, Any]]]
+
+    # Search parameters - Added fields
+    radius: Optional[int]
+    search_strategy: Optional[str]
+    use_cache: Optional[bool]
+
+    # Clarification tracking - Added fields
+    clarification_attempts: Optional[int]
