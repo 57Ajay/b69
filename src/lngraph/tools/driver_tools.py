@@ -31,43 +31,43 @@ class DriverTools:
         """
         self.api_client = api_client
 
-    @tool(
-        description="""
-    Comprehensive driver search with advanced filtering and pagination support.
-    This is the primary tool for finding drivers based on various criteria:
+    # @tool(
+    #     description="""
+    # Comprehensive driver search with advanced filtering and pagination support.
+    # This is the primary tool for finding drivers based on various criteria:
 
-    **Core Functionality:**
-    - Full-featured driver search with 15+ filter options
-    - Intelligent caching for improved performance
-    - Pagination support for large result sets
-    - Multiple search strategies (city, geo-location, hybrid)
+    # **Core Functionality:**
+    # - Full-featured driver search with 15+ filter options
+    # - Intelligent caching for improved performance
+    # - Pagination support for large result sets
+    # - Multiple search strategies (city, geo-location, hybrid)
 
-    **Filter Categories:**
-    1. **Vehicle Preferences**: Types (sedan, SUV, etc.), specific models
-    2. **Demographics**: Age range, gender, marital status
-    3. **Service Options**: Pet-friendly, language preferences
-    4. **Professional Criteria**: Experience, completed rides, verification
-    5. **Location**: City-based or radius-based search
+    # **Filter Categories:**
+    # 1. **Vehicle Preferences**: Types (sedan, SUV, etc.), specific models
+    # 2. **Demographics**: Age range, gender, marital status
+    # 3. **Service Options**: Pet-friendly, language preferences
+    # 4. **Professional Criteria**: Experience, completed rides, verification
+    # 5. **Location**: City-based or radius-based search
 
-    **Smart Features:**
-    - Hybrid search combines city and geo-location for best results
-    - Customizable sorting (by last active, rating, experience)
-    - Supports complex queries with multiple filters
-    - Returns metadata including total count and pagination info
+    # **Smart Features:**
+    # - Hybrid search combines city and geo-location for best results
+    # - Customizable sorting (by last active, rating, experience)
+    # - Supports complex queries with multiple filters
+    # - Returns metadata including total count and pagination info
 
-    **Example Queries:**
-    - "Find top-rated SUV drivers in Mumbai"
-    - "Show experienced female drivers who speak English in Delhi"
-    - "Get pet-friendly drivers with 5+ years experience"
+    # **Example Queries:**
+    # - "Find top-rated SUV drivers in Mumbai"
+    # - "Show experienced female drivers who speak English in Delhi"
+    # - "Get pet-friendly drivers with 5+ years experience"
 
-    **Response includes:**
-    - Matching drivers with complete profiles
-    - Total count and pagination details
-    - Applied filters for transparency
-    - Success/error status
-    """,
-        args_schema=SearchDriversInput,
-    )
+    # **Response includes:**
+    # - Matching drivers with complete profiles
+    # - Total count and pagination details
+    # - Applied filters for transparency
+    # - Success/error status
+    # """,
+    #     args_schema=SearchDriversInput,
+    # )
     async def search_drivers_tool(
         self,
         city: str,

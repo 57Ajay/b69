@@ -1,8 +1,9 @@
 import httpx
 from typing import Dict, Any, List, Optional, Union
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
 from src.models.drivers_model import DriverModel, APIResponse
+from src.services.cache_service import RedisService
 
 logger = logging.getLogger(__name__)
 
@@ -10,11 +11,11 @@ logger = logging.getLogger(__name__)
 class DriversAPIClient:
     """Client for interacting with the Premium Drivers API"""
 
-    def __init__(self, session_id: str, cache_duration_minutes: int = 5):
+    def __init__(self, session_id: str, redis_service: RedisService, cache_duration_minutes: int = 1):
         self.base_url = "https://us-central1-cabswale-ai.cloudfunctions.net"
         self.endpoint = "/cabbot-botApiGetPremiumDrivers"
         self.client = httpx.AsyncClient(timeout=30.0)
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self.redis_service = redis_service
         self.cache_duration = timedelta(minutes=cache_duration_minutes)
         self.session_id = session_id
 
@@ -24,33 +25,27 @@ class DriversAPIClient:
 
     async def _get_from_cache(self, cache_key: str) -> Union[APIResponse, None]:
         """Get data from cache if not expired"""
-        # print("\ngetting from cache.....\n")
-
-        if cache_key in self._cache:
-            cached_data: Dict[str, Any] = self._cache.get(cache_key) or {}
-            if cached_data.get("expires", 0) > datetime.now():
-                logger.info(f"Cache hit for key: {cache_key}")
-                return APIResponse.model_validate(cached_data.get("data"))
-            else:
-                del self._cache[cache_key]
+        cached_data = await self.redis_service.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for key: {cache_key}")
+            return APIResponse.model_validate(cached_data)
         return None
 
-    def _save_to_cache(self, cache_key: str, data: APIResponse):
-        # print("\nSaving to cache.....\n")
+    async def _save_to_cache(self, cache_key: str, data: APIResponse):
         """Save data to cache with expiration"""
-        self._cache[cache_key] = {
-            "data": data,
-            "expires": datetime.now() + self.cache_duration,
-        }
+        await self.redis_service.set(
+            cache_key, data.model_dump(by_alias=True), expiration_seconds=int(self.cache_duration.total_seconds())
+        )
         logger.info(f"Cached data for key: {cache_key}")
 
     async def _get_driver_detail(self, cache_key: str, driverId: str) -> DriverModel:
         drivers_from_cache = await self._get_from_cache(cache_key)
         driver_data: DriverModel = DriverModel(**{})
-        for driver in APIResponse.model_validate(drivers_from_cache).data :
-            if driverId == driver.id:
-                driver_data: DriverModel = DriverModel.model_validate(driver)
-                break
+        if drivers_from_cache:
+            for driver in drivers_from_cache.data:
+                if driverId == driver.id:
+                    driver_data: DriverModel = DriverModel.model_validate(driver)
+                    break
         return driver_data
 
 
@@ -178,7 +173,10 @@ class DriversAPIClient:
 
         if use_cache:
             cache_key = self._generate_cache_key(city, page)
+            logger.info("Errored here")
             cached_data = await self._get_from_cache(cache_key)
+            logger.info("Errored here")
+
             if cached_data:
                 return { "success": True, "data": cached_data }
 
@@ -201,7 +199,7 @@ class DriversAPIClient:
             # Cache successful response
             if use_cache and data.success:
                 cache_key = self._generate_cache_key(city, page)
-                self._save_to_cache(cache_key, data)
+                await self._save_to_cache(cache_key, data)
             return { "success": True, "data": data }
 
         except httpx.HTTPStatusError as e:
@@ -221,17 +219,17 @@ class DriversAPIClient:
             logger.error(f"Unexpected error: {e}")
             return {"success": False, "message": f"Unexpected error: {str(e)}"}
 
-    def clear_cache(self, city: Optional[str] = None):
+    async def clear_cache(self, city: Optional[str] = None):
         """Clear cache for specific city or all cache"""
         if city:
             # Clear cache for specific city
-            keys_to_remove = [k for k in self._cache.keys() if f"city={city}" in k]
-            for key in keys_to_remove:
-                del self._cache[key]
+            keys_to_remove = [k async for k in self.redis_service.redis_client.scan_iter(f"*_{city}_*")]
+            if keys_to_remove:
+                await self.redis_service.redis_client.delete(*keys_to_remove)
             logger.info(f"Cleared cache for city: {city}")
         else:
             # Clear all cache
-            self._cache.clear()
+            await self.redis_service.clear_all()
             logger.info("Cleared all cache")
 
     async def close(self):
