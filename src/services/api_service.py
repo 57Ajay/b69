@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class DriversAPIClient:
     """Client for interacting with the Premium Drivers API"""
 
-    def __init__(self, session_id: str, redis_service: RedisService, cache_duration_minutes: int = 1):
+    def __init__(self, session_id: str, redis_service: RedisService, cache_duration_minutes: int = 10):
         self.base_url = "https://us-central1-cabswale-ai.cloudfunctions.net"
         self.endpoint = "/cabbot-botApiGetPremiumDrivers"
         self.client = httpx.AsyncClient(timeout=30.0)
@@ -23,12 +23,12 @@ class DriversAPIClient:
         """Generate a cache key from parameters"""
         return f"{self.session_id}_{city}_{page}"
 
-    async def _get_from_cache(self, cache_key: str) -> Union[APIResponse, None]:
+    async def _get_from_cache(self, cache_key: str) -> Union[Dict[str, Any], None]:
         """Get data from cache if not expired"""
         cached_data = await self.redis_service.get(cache_key)
         if cached_data:
             logger.info(f"Cache hit for key: {cache_key}")
-            return APIResponse.model_validate(cached_data)
+            return cached_data
         return None
 
     async def _save_to_cache(self, cache_key: str, data: APIResponse):
@@ -39,15 +39,20 @@ class DriversAPIClient:
         logger.info(f"Cached data for key: {cache_key}")
 
     async def _get_driver_detail(self, cache_key: str, driverId: str) -> DriverModel:
+        """Get specific driver details from cache"""
         drivers_from_cache = await self._get_from_cache(cache_key)
-        driver_data: DriverModel = DriverModel(**{})
-        if drivers_from_cache:
-            for driver in drivers_from_cache.data:
-                if driverId == driver.id:
-                    driver_data: DriverModel = DriverModel.model_validate(driver)
-                    break
-        return driver_data
+        if not drivers_from_cache:
+            raise ValueError(f"No cached data found for cache key: {cache_key}")
 
+        # Parse the cached response
+        api_response = APIResponse.model_validate(drivers_from_cache)
+
+        # Find the specific driver
+        for driver in api_response.data:
+            if driverId == driver.id:
+                return driver
+
+        raise ValueError(f"Driver with ID {driverId} not found in cached data")
 
     def _build_driver_filters(
         self,
@@ -63,8 +68,9 @@ class DriversAPIClient:
         married: Optional[bool],
         custom_filters: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
+        """Build filter dictionary for API request"""
         filters: Dict[str, Any] = {}
-        print("building filters")
+        logger.debug("Building driver filters")
 
         optional_list_filters = {
             "vehicleTypes": vehicle_types,
@@ -96,7 +102,6 @@ class DriversAPIClient:
             filters.update(custom_filters)
 
         return filters
-
 
     async def get_drivers(
         self,
@@ -156,68 +161,62 @@ class DriversAPIClient:
 
         # Add optional filters
         filters = self._build_driver_filters(
-                vehicle_types=vehicle_types,
-                gender=gender,
-                min_age=min_age,
-                max_age=max_age,
-                is_pet_allowed=is_pet_allowed,
-                min_connections=min_connections,
-                min_experience=min_experience,
-                languages=languages,
-                profile_verified=profile_verified,
-                married=married,
-                custom_filters=custom_filters,
-            )
+            vehicle_types=vehicle_types,
+            gender=gender,
+            min_age=min_age,
+            max_age=max_age,
+            is_pet_allowed=is_pet_allowed,
+            min_connections=min_connections,
+            min_experience=min_experience,
+            languages=languages,
+            profile_verified=profile_verified,
+            married=married,
+            custom_filters=custom_filters,
+        )
         params.update(filters)
-        print("Filters applied -> \n", filters)
+        logger.debug(f"Filters applied: {filters}")
 
+        # Check cache first if enabled
         if use_cache:
             cache_key = self._generate_cache_key(city, page)
-            logger.info("Errored here")
             cached_data = await self._get_from_cache(cache_key)
-            logger.info("Errored here")
 
             if cached_data:
-                return { "success": True, "data": cached_data }
+                # Convert cached data to APIResponse
+                api_response = APIResponse.model_validate(cached_data)
+                return {"success": True, "data": api_response}
 
         try:
             url = f"{self.base_url}{self.endpoint}"
-            logger.info(
-                f"Fetching premium drivers from: {url}\
-                    with params: {params}"
-            )
-            # print("Calling api with params -> \n", params)
+            logger.info(f"Fetching premium drivers from: {url} with params: {params}")
 
             response = await self.client.get(url, params=params)
             response.raise_for_status()
-            # print("Response received")
 
             data: APIResponse = APIResponse.model_validate(response.json())
-            # print("\nGOT DATA\n", data)
-            # print("IT IS DONE AND OK")
 
             # Cache successful response
             if use_cache and data.success:
                 cache_key = self._generate_cache_key(city, page)
                 await self._save_to_cache(cache_key, data)
-            return { "success": True, "data": data }
+
+            return {"success": True, "data": data}
 
         except httpx.HTTPStatusError as e:
-            logger.error(
-                f"HTTP error {e.response.status_code}:\
-                    {e.response.text}"
-            )
+            error_msg = f"HTTP error {e.response.status_code}: {e.response.text}"
+            logger.error(error_msg)
             return {
                 "success": False,
-                "message": f"HTTP error {e.response.status_code}:\
-                        {e.response.text}",
+                "message": error_msg,
             }
         except httpx.RequestError as e:
-            logger.error(f"Request error: {e}")
-            return {"success": False, "message": f"Request failed: {str(e)}"}
+            error_msg = f"Request failed: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return {"success": False, "message": f"Unexpected error: {str(e)}"}
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
 
     async def clear_cache(self, city: Optional[str] = None):
         """Clear cache for specific city or all cache"""

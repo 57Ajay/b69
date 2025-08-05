@@ -55,10 +55,20 @@ class BookDriverNode:
             str(state["search_city"]),
             state["current_page"]
         )
-        current_drivers = APIResponse.model_validate(await self.driver_tools.api_client._get_from_cache(cache_key)).data
 
-        if not current_drivers:
-            logger.warning("No drivers in state to get info for.")
+        # Get current drivers from cache
+        try:
+            cached_data = await self.driver_tools.api_client._get_from_cache(cache_key)
+            if not cached_data:
+                logger.warning("No drivers in cache to book.")
+                return {
+                    "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
+                    "failed_node": "book_driver_node"
+                }
+
+            current_drivers = APIResponse.model_validate(cached_data).data
+        except Exception as e:
+            logger.error(f"Error retrieving drivers from cache: {e}")
             return {
                 "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
                 "failed_node": "book_driver_node"

@@ -84,6 +84,7 @@ class ClassifyIntentNode:
             response = Intent.model_validate(res)
 
             logger.info(f"Classified intent as: {response.intent}")
+            print("state city:", state["search_city"])
             return {"intent": response.intent}
         except Exception as e:
             logger.error(f"Error during intent classification: {e}", exc_info=True)
