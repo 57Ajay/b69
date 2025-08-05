@@ -15,6 +15,7 @@ class SearchEntities(BaseModel):
     Pydantic model for extracting entities required for a driver search.
     """
     city: Optional[str] = Field(
+        default=None,
         description="The city where the user wants to find a driver, e.g., 'delhi', 'mumbai'."
     )
 
@@ -54,7 +55,12 @@ class SearchDriversNode:
         if not city:
             logger.debug("City not in state, attempting to extract from message.")
             extract_prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are an entity extraction expert. From the user's message, extract the city they want to search for a cab in. If no city is mentioned, respond with null."),
+                ("system", """You are an entity extraction expert. From the user's message, extract the city they want to search for a cab in.
+                Only extract if a city is explicitly mentioned. If no city is mentioned, return null for the city field.
+                Examples:
+                - "find me a cab in delhi" -> city: "delhi"
+                - "book me a cab" -> city: null
+                - "i need a ride from mumbai" -> city: "mumbai" """),
                 ("human", "{user_message}")
             ])
             extract_chain = extract_prompt | self.llm.with_structured_output(SearchEntities)
@@ -70,7 +76,7 @@ class SearchDriversNode:
         if not city:
             logger.warning("No city found in message or state. Asking user for clarification.")
             # This will be routed to a response generator to ask the user for a city.
-            return {"next_node": "clarification_needed", "last_error": "City is required for search."}
+            return {"last_error": "I need to know which city you're looking for a cab in. Please specify the city.", "failed_node": "search_drivers_node"}
 
         logger.info(f"Performing driver search in city: {city}")
 

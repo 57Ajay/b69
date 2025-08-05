@@ -51,14 +51,43 @@ class GetDriverInfoNode:
         logger.info("Executing GetDriverInfoNode...")
 
         user_message = state["last_user_message"]
+
+        # Check if we have search_city in state
+        if not state.get("search_city"):
+            logger.warning("No search city in state for driver info request.")
+            return {
+                "last_error": "I don't have a search location. Please search for drivers first by specifying a city.",
+                "failed_node": "get_driver_info_node"
+            }
+
         cache_key = self.driver_tools.api_client._generate_cache_key(
             str(state["search_city"]),
             state["current_page"]
         )
-        current_drivers = APIResponse.model_validate(await self.driver_tools.api_client._get_from_cache(cache_key)).data
+
+        # Fix: Properly handle None response from cache
+        try:
+            cached_data = await self.driver_tools.api_client._get_from_cache(cache_key)
+            if cached_data is None:
+                logger.warning("No drivers in cache to get info for.")
+                return {
+                    "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
+                    "failed_node": "get_driver_info_node"
+                }
+
+            # Validate the cached data before accessing .data
+            api_response = APIResponse.model_validate(cached_data)
+            current_drivers = api_response.data
+
+        except Exception as e:
+            logger.error(f"Error retrieving drivers from cache: {e}")
+            return {
+                "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
+                "failed_node": "get_driver_info_node"
+            }
 
         if not current_drivers:
-            logger.warning("No drivers in state to get info for.")
+            logger.warning("No drivers in cached data.")
             return {
                 "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
                 "failed_node": "get_driver_info_node"

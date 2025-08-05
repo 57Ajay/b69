@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 class InitializeAgentNode:
     """
-    Node to initialize the agent's state at the beginning of a conversation.
+    Node to initialize the agent's state ONLY if not already initialized.
     """
 
     def __init__(self):
@@ -18,50 +18,23 @@ class InitializeAgentNode:
 
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
-        Executes the node's logic to set up the initial agent state.
+        CRITICAL FIX: Only update last_user_message, preserve all other state.
 
         Args:
             state: The current state of the agent.
 
         Returns:
-            A dictionary with the updated state values.
+            A dictionary with minimal state updates.
         """
         logger.info("Executing InitializeAgentNode...")
 
-        # Default values for a new session
-        initialized_state = {
-            "user": state.get("user"),
+        # CRITICAL: Only update the last user message, preserve everything else
+        updates = {
             "last_user_message": state["messages"][-1].content if state.get("messages") else "",
-            "conversation_language": "en",
-            "intent": None,
-            "search_city": None,
-            "current_page": 1,
-            "page_size": 10,
-            "radius": 100,
-            "search_strategy": "hybrid",
-            "use_cache": True,
-            "active_filters": {},
-            "previous_filters": [],
-            "current_drivers": [],
-            "total_results": 0,
-            "has_more_results": False,
-            "selected_driver": None,
-            "booking_status": "none",
-            "booking_details": None,
-            "dropLocation": None,
-            "pickupLocation": None,
-            "trip_type": "one-way", # Default trip type
-            "trip_duration": None,
-            "full_trip_details": False,
-            "trip_doc_id": "",
-            "last_error": None,
-            "retry_count": 0,
-            "failed_node": None,
-            "next_node": None,
-            "filter_relaxation_suggestions": None,
         }
 
-        updated_state = {**state, **initialized_state}
-        logger.debug(f"Initialized state for session {updated_state.get('session_id')}")
+        logger.debug(f"Preserving state for session {state.get('session_id')}")
+        logger.debug(f"Current search_city: {state.get('search_city')}")
+        logger.debug(f"Current drivers count: {len(state.get('current_drivers', []))}")
 
-        return updated_state
+        return updates

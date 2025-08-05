@@ -1,4 +1,3 @@
-
 import asyncio
 import uuid
 from langchain_google_vertexai import ChatVertexAI
@@ -9,6 +8,7 @@ from src.services.api_service import DriversAPIClient
 from src.lngraph.tools.driver_tools import DriverTools
 from src.lngraph.graph import create_agent_graph
 import logging
+from src.models.agent_state_model import AgentState
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -44,10 +44,8 @@ async def main():
     print("\nCab Booking Agent is ready. Type 'exit' to end the conversation.")
     print("-" * 50)
 
-    # This is our persistent state for the entire conversation.
-    # The graph's entry node will populate the full state on the first run.
-    # We only need to manage the core inputs that change turn-by-turn.
-    conversation_state = {
+    # CRITICAL FIX: Initialize with complete state structure
+    conversation_state: AgentState = {
         "session_id": session_id,
         "messages": [],
         "user": UserModel(
@@ -57,7 +55,36 @@ async def main():
             phone_no="69696969",
             preferred_languages=["english"],
             profile_image="69.com"
-        )
+        ),
+        # Pre-initialize ALL required state fields to prevent reset
+        "last_user_message": "",
+        "conversation_language": "en",
+        "intent": None,
+        "search_city": None,
+        "current_page": 1,
+        "page_size": 10,
+        "radius": 100,
+        "search_strategy": "hybrid",
+        "use_cache": True,
+        "active_filters": {},
+        "previous_filters": [],
+        "current_drivers": [],
+        "total_results": 0,
+        "has_more_results": False,
+        "selected_driver": None,
+        "booking_status": "none",
+        "booking_details": None,
+        "dropLocation": None,
+        "pickupLocation": None,
+        "trip_type": "one-way",
+        "trip_duration": None,
+        "full_trip_details": False,
+        "trip_doc_id": "",
+        "last_error": None,
+        "retry_count": 0,
+        "failed_node": None,
+        "next_node": None,
+        "filter_relaxation_suggestions": None,
     }
 
     while True:
@@ -70,7 +97,7 @@ async def main():
         conversation_state["messages"].append(HumanMessage(content=user_input))
 
         try:
-            # Invoke the graph with the UPDATED conversation_state
+            # CRITICAL: Invoke the graph with the COMPLETE conversation_state
             final_state = await app.ainvoke(conversation_state)
 
             # The final response is the last message added by the agent

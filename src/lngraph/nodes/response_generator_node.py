@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 class ResponseGeneratorNode:
     """
     Node to generate a final, user-facing response based on the agent's state.
+    CRITICAL: Never generate fake data, only use real state information.
     """
 
     def __init__(self, llm: ChatVertexAI):
@@ -24,6 +25,7 @@ class ResponseGeneratorNode:
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
         Generates a response to the user based on the current state.
+        CRITICAL: Uses only real data from state, never generates fake information.
 
         Args:
             state: The current state of the agent.
@@ -33,42 +35,55 @@ class ResponseGeneratorNode:
         """
         logger.info("Executing ResponseGeneratorNode...")
 
+        # CRITICAL: Build response based on REAL state data only
+        current_drivers = state.get("current_drivers", [])
+        search_city = state.get("search_city")
+        last_error = state.get("last_error")
+        intent = state.get("intent")
+
         prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a helpful and friendly cab booking assistant.
-            Your goal is to provide a concise and relevant response to the user based on the current state of the conversation.
+            CRITICAL RULES:
+            1. NEVER generate fake driver names, data, or information
+            2. ONLY use the exact driver information provided in the state
+            3. If no drivers are available, ask the user to search for drivers first
+            4. If missing trip information, ask for pickup/drop locations
+            5. Always be accurate and never hallucinate data
 
-            - If there are drivers in the state, list their names, experience, and vehicle types.
-            - If a driver has been selected, provide their detailed information.
-            - If a booking is confirmed, state it clearly and provide the booking details.
-            - If there is an error, apologize and state the error message clearly.
-            - If the last intent was 'general_intent', have a friendly, general conversation.
-            - If clarification is needed (e.g., for a city), ask the user for the necessary information.
+            Current State Information:
+            - Search City: {search_city}
+            - Number of Real Drivers: {driver_count}
+            - Intent: {intent}
+            - Last Error: {last_error}
+            - Real Driver Data: {real_drivers}
+
+            Response Guidelines:
+            - If there's an error, explain it clearly and ask for the missing information
+            - If there are real drivers, list them with their actual names and details
+            - If no drivers but user wants info/filter, ask them to search first
+            - Be helpful but never make up information
             """),
-            ("human", "Conversation History:\n{history}\n\nHere is the current state of our conversation, please respond to the user based on this:\n{agent_state}")
+            ("human", "Conversation History:\n{history}\n\nPlease respond based on the current state.")
         ])
 
         chain = prompt | self.llm
 
         history = "\n".join([f"{msg.type}: {msg.content}" for msg in state["messages"]])
 
-        # We pass a simplified version of the state to the LLM to avoid overwhelming it.
-        selected_driver = state.get("selected_driver")
-        relevant_state = {
-            "last_user_message": state["last_user_message"],
-            "intent": state["intent"],
-            "search_city": state["search_city"],
-            "active_filters": state["active_filters"],
-            "current_drivers_summary": [f"{d.name} ({d.experience} yrs exp, {', '.join([v.vehicle_type for v in d.verified_vehicles])})" for d in state.get("current_drivers", [])],
-            "selected_driver": selected_driver.model_dump(by_alias=True) if selected_driver else None,
-            "booking_status": state["booking_status"],
-            "booking_details": state.get("booking_details"),
-            "last_error": state.get("last_error")
-        }
+        # Prepare real driver information
+        real_drivers_info = []
+        for driver in current_drivers:
+            vehicle_types = [v.vehicle_type for v in driver.verified_vehicles] if driver.verified_vehicles else ["unknown"]
+            real_drivers_info.append(f"{driver.name} ({driver.experience} yrs exp, {', '.join(vehicle_types)})")
 
         try:
             response = await chain.ainvoke({
                 "history": history,
-                "agent_state": str(relevant_state)
+                "search_city": search_city or "Not specified",
+                "driver_count": len(current_drivers),
+                "intent": intent or "unknown",
+                "last_error": last_error or "None",
+                "real_drivers": real_drivers_info if real_drivers_info else "No drivers available"
             })
 
             # The response from the LLM is the content of the AIMessage
