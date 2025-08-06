@@ -20,6 +20,7 @@ class FilterEntities(BaseModel):
     gender: Optional[str] = Field(None, description="Driver's gender, e.g., 'male', 'female'.")
     is_pet_allowed: Optional[bool] = Field(None, description="Whether the driver allows pets.")
     min_experience: Optional[int] = Field(None, description="Minimum years of driving experience.")
+    min_age: Optional[int] = Field(None, description="Minimum age of the driver.")
     languages: Optional[List[str]] = Field(None, description="List of languages the driver speaks.")
     married: Optional[bool] = Field(None, description="The driver's marital status.")
     clear_previous_filters: Optional[bool] = Field(None, description="Whether to clear all previous filters before applying new ones.")
@@ -75,6 +76,7 @@ class FilterDriversNode:
             - Gender: male, female
             - Pet-friendliness: pets allowed, pet-friendly
             - Experience: years of experience, minimum experience
+            - Age: minimum age
             - Languages: hindi, english, punjabi, etc.
             - Marital status: married, single
             - Filter management: "remove old filter", "clear previous", "reset filters"
@@ -89,8 +91,6 @@ class FilterDriversNode:
         try:
             raw = await extract_chain.ainvoke({"user_message": user_message})
             extracted_filters = FilterEntities.model_validate(raw)
-
-            # Convert to dict, excluding unset values
             filter_dict = extracted_filters.model_dump(exclude_unset=True)
             clear_filters = filter_dict.pop("clear_previous_filters", False)
 
@@ -112,32 +112,31 @@ class FilterDriversNode:
             updated_filters = {**current_filters, **filter_dict}
             logger.info(f"Merging filters. Previous: {current_filters}, New: {filter_dict}, Combined: {updated_filters}")
 
-        # 3. Call the search tool with the new filters
+        # 3. Call the search tool with the new filters to get fresh results
         try:
             tool_response = await self.driver_tools.search_drivers_tool.ainvoke({
                 "city": state["search_city"],
-                "page": 1,  # Always start from page 1 for a new filter
+                "page": 1,
                 "limit": state["limit"],
                 **updated_filters
             })
 
             if tool_response.get("success"):
-                drivers: List[DriverModel] = tool_response.get("drivers", [])
-                driver_count = len(drivers)
-                logger.info(f"Successfully found {driver_count} drivers with filters.")
+                filtered_drivers: List[DriverModel] = tool_response.get("drivers", [])
+                logger.info(f"Successfully filtered drivers. Found {len(filtered_drivers)} matches.")
 
                 return {
-                    "current_page": 1,
+                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers],
+                    "all_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers],
                     "active_filters": updated_filters,
-                    "is_filtered": True,
-                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
-                    "all_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
-                    "total_results": tool_response.get("total", 0),
-                    "has_more_results": tool_response.get("has_more", False),
                     "last_error": None,
+                    "is_filtered": True,
+                    "total_filtered_results": len(filtered_drivers),
                     "failed_node": None,
                     "selected_driver": None,
                     "driver_summary": None,
+                    "current_page": 1,
+                    "has_more_results": tool_response.get("has_more", False)
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while filtering.')

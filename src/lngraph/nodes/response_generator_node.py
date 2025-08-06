@@ -17,7 +17,7 @@ class ResponseGeneratorNode:
         """
         Initializes the ResponseGeneratorNode.
 
-        Args:
+        Args[]:
             llm: An instance of a language model.
         """
         self.llm = llm
@@ -93,6 +93,8 @@ class ResponseGeneratorNode:
                 response_content = f"Here is the profile for {name}: {driver_summary.get('profile_url')}"
             elif "experience" in last_user_message:
                 response_content = f"{name} has {driver_summary.get('experience', 0)} years of experience."
+            elif "contact" in last_user_message:
+                 response_content = f"You can contact {name} at: {driver_summary.get('phone')}."
             else: # General info
                 age = driver_summary.get("age", "Not specified")
                 city = driver_summary.get("city", "Unknown")
@@ -123,9 +125,10 @@ class ResponseGeneratorNode:
                 filter_text = f" (filtered by: {', '.join(filter_parts)})"
 
             response_content = f"I found {len(current_drivers)} driver{'s' if len(current_drivers) != 1 else ''} in {search_city}{filter_text}:\n\n"
-            if not search_city:
-                return {"message": "No drivers found because the search city is not specified"}
+
             for i, driver in enumerate(current_drivers, 1):
+                if not search_city:
+                    return {"message": ["Please provide a valid city name."]}
                 cache_key = self.client._generate_cache_key(search_city, page)
                 full_driver_detail = await self.client._get_driver_detail(cache_key, driver["driver_id"])
 
