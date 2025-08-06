@@ -14,7 +14,7 @@ IntentType = Literal[
     "driver_info_intent",
     "booking_or_confirmation_intent",
     "filter_intent",
-    "more_driver_intent"
+    "more_drivers_intent",
     "general_intent",
 ]
 
@@ -30,7 +30,7 @@ class Intent(BaseModel):
         "booking_or_confirmation_intent",
         "filter_intent",
         "general_intent",
-        "more_driver_intent",
+        "more_drivers_intent",
         """)
 
 class ClassifyIntentNode:
@@ -66,6 +66,7 @@ class ClassifyIntentNode:
             - driver_info_intent: User is asking for more details about a specific driver already presented. (e.g., "tell me more about Ramesh", "what's his experience?")
             - booking_or_confirmation_intent: User wants to book a ride with a specific driver. (e.g., "book him for me", "confirm my ride with Suresh")
             - filter_intent: User wants to add or modify filters for an ongoing search. (e.g., "show me only SUVs", "can I find someone who speaks english?")
+            - more_drivers_intent: User asks to see more drivers from the current search. (e.g., "show me more", "next page", "any other options?")
             - general_intent: User is having a general conversation, greeting, or asking something outside the scope of booking a cab. (e.g., "hello", "what's the weather like?")
 
             Based on the last user message, determine the most appropriate intent."""),

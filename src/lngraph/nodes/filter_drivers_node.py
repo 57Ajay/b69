@@ -106,43 +106,38 @@ class FilterDriversNode:
         current_filters = state.get("active_filters", {})
 
         if clear_filters:
-            # Clear all previous filters and start fresh
             updated_filters = filter_dict
             logger.info(f"Clearing previous filters and applying new ones: {updated_filters}")
         else:
-            # Merge with existing filters (new values override old ones)
             updated_filters = {**current_filters, **filter_dict}
             logger.info(f"Merging filters. Previous: {current_filters}, New: {filter_dict}, Combined: {updated_filters}")
 
-        # 3. Call the tool to apply filters to the cached results
+        # 3. Call the search tool with the new filters
         try:
-            tool_response = await self.driver_tools.get_drivers_with_user_filter_via_cache_tool.ainvoke({
+            tool_response = await self.driver_tools.search_drivers_tool.ainvoke({
                 "city": state["search_city"],
-                "page": state["current_page"],
-                "filter_obj": updated_filters,
+                "page": 1,  # Always start from page 1 for a new filter
+                "limit": state["limit"],
+                **updated_filters
             })
 
-            logger.info(f"Tool response:----------------------\n \n{tool_response}\n\n---------------------------")
-
             if tool_response.get("success"):
-                filtered_drivers: List[DriverModel] = tool_response.get("filtered_drivers", [])
-                logger.info(f"Successfully filtered drivers. Found {len(filtered_drivers)} matches.")
-
-                # CRITICAL: Don't lose the original drivers - keep them accessible
-                logger.info("Current Drivers: ",[{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers])
+                drivers: List[DriverModel] = tool_response.get("drivers", [])
+                driver_count = len(drivers)
+                logger.info(f"Successfully found {driver_count} drivers with filters.")
 
                 return {
-                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers],
+                    "current_page": 1,
                     "active_filters": updated_filters,
-                    "last_error": None,
-                    # Keep track that we're in filtered mode
                     "is_filtered": True,
-                    "total_filtered_results": len(filtered_drivers),
-                    # Clear any previous errors
+                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
+                    "all_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
+                    "total_results": tool_response.get("total", 0),
+                    "has_more_results": tool_response.get("has_more", False),
+                    "last_error": None,
                     "failed_node": None,
-                    # CRITICAL: Clear previous driver selection when filtering
                     "selected_driver": None,
-                    "driver_summary": None
+                    "driver_summary": None,
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while filtering.')

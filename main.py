@@ -22,7 +22,7 @@ async def main():
     logger.info("Initializing services...")
 
     # Initialize the Language Model
-    llm = ChatVertexAI(model="gemini-2.0-flash", temperature=0.5)
+    llm = ChatVertexAI(model="gemini-2.5-flash", temperature=0)
 
     # Initialize Redis Service for caching
     redis_service = RedisService()
@@ -61,16 +61,16 @@ async def main():
         "intent": None,
         "search_city": None,
         "current_page": 1,
-        "limit": 10,
+        "limit": 5, # Show 5 drivers at a time
         "radius": 100,
         "search_strategy": "hybrid",
         "use_cache": True,
         "active_filters": {},
         "previous_filters": [],
-        "is_filtered": False,  # NEW field
-        "total_filtered_results": 0,  # NEW field
+        "is_filtered": False,
+        "total_filtered_results": 0,
         "current_drivers": [],
-        "all_drivers": [],  # NEW field to preserve original search results
+        "all_drivers": [],
         "total_results": 0,
         "has_more_results": False,
         "selected_driver": None,
@@ -108,34 +108,22 @@ async def main():
                 print("🚗 Agent: Please tell me what you'd like to do.")
                 continue
 
-            # Append the new user message to the conversation state's message history
             conversation_state["messages"].append(HumanMessage(content=user_input))
-
-            # Clear previous errors when starting new interaction
+            conversation_state["last_user_message"] = user_input
             conversation_state["last_error"] = None
 
             print("🚗 Agent: ", end="", flush=True)
 
-            # CRITICAL FIX: The graph invocation returns the final state after END
-            # We need to properly extract and merge the state updates
             try:
                 result = await app.ainvoke(conversation_state)
-
-                # CRITICAL: The result IS the final state after all nodes have executed
-                # We need to use this as our new conversation state
                 if result:
-                    # Update conversation_state with all the changes from the graph execution
                     conversation_state.update(result)
-
-                    # The final response is the last message added by the agent
                     if result.get("messages") and len(result["messages"]) > 0:
-                        # Find the last AI message
                         last_ai_message = None
                         for msg in reversed(result["messages"]):
                             if hasattr(msg, 'type') and msg.type == 'ai':
                                 last_ai_message = msg
                                 break
-
                         if last_ai_message:
                             print(f"{last_ai_message.content}")
                         else:
@@ -152,14 +140,12 @@ async def main():
                 conversation_state["failed_node"] = None
                 continue
 
-            # Debug info (can be removed in production)
             if conversation_state.get("search_city"):
                 drivers_count = len(conversation_state.get("current_drivers", []))
                 all_drivers_count = len(conversation_state.get("all_drivers", []))
                 filter_status = " (filtered)" if conversation_state.get("is_filtered", False) else ""
                 print(f"\n[Debug: {drivers_count}/{all_drivers_count} drivers available in {conversation_state['search_city']}{filter_status}]")
 
-            # Additional debug info for state tracking
             logger.debug(f"Post-execution state - Search city: {conversation_state.get('search_city')}")
             logger.debug(f"Current drivers: {len(conversation_state.get('current_drivers', []))}")
             logger.debug(f"All drivers: {len(conversation_state.get('all_drivers', []))}")
@@ -172,7 +158,6 @@ async def main():
         except Exception as e:
             logger.critical(f"An unhandled error occurred in the main loop: {e}", exc_info=True)
             print("\n🚗 Agent: I'm sorry, I encountered a technical issue. Let me try to help you again.")
-            # Reset error state but keep the conversation context
             conversation_state["last_error"] = None
             conversation_state["failed_node"] = None
 

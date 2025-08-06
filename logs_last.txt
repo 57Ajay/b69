@@ -1,0 +1,277 @@
+
+ajay57 in ~/Projects/py/b69 on main ● λ uv run main.py
+2025-08-06 18:46:20,231 - INFO - Initializing services...
+2025-08-06 18:46:23,451 - INFO - Building the agent graph...
+
+🚗 Cab Booking Agent is ready! Type 'exit' to end the conversation.
+============================================================
+💬 You can ask me to:
+  • Find drivers: 'book me a cab from delhi to jaipur'
+  • Get driver info: 'tell me about ramesh' or 'ramesh phone number'
+  • Apply filters: 'show me SUV drivers' or 'drivers with 5+ years experience'
+  • Book a ride: 'book with ramesh'
+------------------------------------------------------------
+
+👤 You: find me drivers from delhi to jaipur
+🚗 Agent: 2025-08-06 18:46:37,901 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:46:37,903 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:46:42,376 - INFO - Classified intent as: driver_search_intent
+state city: None
+DEBUG: Routing intent 'driver_search_intent' with search_city: None, drivers: 0
+2025-08-06 18:46:42,381 - INFO - Executing TripInfoCollectionNode...
+2025-08-06 18:46:44,260 - INFO - Complete trip information collected
+DEBUG: Trip info complete, proceeding to search drivers
+2025-08-06 18:46:44,263 - INFO - Executing SearchDriversNode...
+2025-08-06 18:46:44,263 - INFO - Performing driver search in city: delhi
+2025-08-06 18:46:44,269 - INFO - Fetching premium drivers from: https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers with params: {'city': 'delhi', 'page': 1, 'limit': 5, 'radius': 100, 'searchStrategy': 'hybrid', 'sortBy': 'lastAccess:desc'}
+2025-08-06 18:46:46,096 - INFO - HTTP Request: GET https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers?city=delhi&page=1&limit=5&radius=100&searchStrategy=hybrid&sortBy=lastAccess%3Adesc "HTTP/1.1 200 OK"
+2025-08-06 18:46:46,298 - INFO - Cached data for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:46:46,299 - INFO - Successfully found 5 drivers.
+2025-08-06 18:46:46,301 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:46:46,304 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:46:46,308 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:46:46,311 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:46:46,316 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:46:46,321 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:46:46,323 - INFO - Generated AI Response: I found 5 drivers in delhi:
+
+1. Bharat Singh 0 yrs exp, sedan, ₹12/km
+2. Kapil 0 yrs exp, suv, ₹15/km
+3. Ravi 0 yrs exp, sedan, ₹10/km
+4. Pushpendra Yadav 0 yrs exp, hatchback, ₹8/km
+5. Kamod Kumar 5 yrs exp, hatchback, ₹10/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi:
+
+1. Bharat Singh 0 yrs exp, sedan, ₹12/km
+2. Kapil 0 yrs exp, suv, ₹15/km
+3. Ravi 0 yrs exp, sedan, ₹10/km
+4. Pushpendra Yadav 0 yrs exp, hatchback, ₹8/km
+5. Kamod Kumar 5 yrs exp, hatchback, ₹10/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/5 drivers available in delhi]
+
+👤 You: give me more drivers
+🚗 Agent: 2025-08-06 18:47:03,754 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:47:03,756 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:47:05,077 - INFO - Classified intent as: more_drivers_intent
+state city: delhi
+DEBUG: Routing intent 'more_drivers_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:47:05,080 - INFO - Executing MoreDriversNode...
+2025-08-06 18:47:05,080 - INFO - Fetching page 2 for drivers in delhi
+2025-08-06 18:47:05,085 - INFO - Fetching premium drivers from: https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers with params: {'city': 'delhi', 'page': 2, 'limit': 5, 'radius': 100, 'searchStrategy': 'hybrid', 'sortBy': 'lastAccess:desc'}
+2025-08-06 18:47:07,105 - INFO - HTTP Request: GET https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers?city=delhi&page=2&limit=5&radius=100&searchStrategy=hybrid&sortBy=lastAccess%3Adesc "HTTP/1.1 200 OK"
+2025-08-06 18:47:07,433 - INFO - Cached data for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_2
+2025-08-06 18:47:07,435 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:47:07,438 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_2
+2025-08-06 18:47:07,443 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_2
+2025-08-06 18:47:07,453 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_2
+2025-08-06 18:47:07,459 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_2
+2025-08-06 18:47:07,464 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_2
+2025-08-06 18:47:07,466 - INFO - Generated AI Response: I found 5 drivers in delhi:
+
+1. Sagar Sharma 4 yrs exp, suv, ₹15/km
+2. rakesh kumar  9 yrs exp, sedan, ₹12/km
+3. Vishal Sharma 0 yrs exp, hatchback, ₹12/km
+4. Bharat Singh 0 yrs exp, sedan, ₹12/km
+5. Kapil 0 yrs exp, suv, ₹15/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi:
+
+1. Sagar Sharma 4 yrs exp, suv, ₹15/km
+2. rakesh kumar  9 yrs exp, sedan, ₹12/km
+3. Vishal Sharma 0 yrs exp, hatchback, ₹12/km
+4. Bharat Singh 0 yrs exp, sedan, ₹12/km
+5. Kapil 0 yrs exp, suv, ₹15/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/10 drivers available in delhi]
+
+👤 You: filter by suv and married drivers who are also avilable for part time
+🚗 Agent: 2025-08-06 18:47:27,283 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:47:27,285 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:47:29,896 - INFO - Classified intent as: filter_intent
+state city: delhi
+DEBUG: Routing intent 'filter_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:47:29,899 - INFO - Executing FilterDriversNode...
+2025-08-06 18:47:32,082 - INFO - Merging filters. Previous: {}, New: {'vehicle_types': ['suv'], 'married': True, 'available_for_part_time_full_time': True}, Combined: {'vehicle_types': ['suv'], 'married': True, 'available_for_part_time_full_time': True}
+2025-08-06 18:47:32,088 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:47:32,090 - INFO - Successfully found 5 drivers with filters.
+2025-08-06 18:47:32,093 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:47:32,095 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:47:32,099 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:47:32,102 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:47:32,106 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:47:32,109 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:47:32,110 - INFO - Generated AI Response: I found 5 drivers in delhi (filtered by: vehicle types: ['suv'], married: True, available for part time full time: True):
+
+1. Bharat Singh 0 yrs exp, sedan, ₹12/km
+2. Kapil 0 yrs exp, suv, ₹15/km
+3. Ravi 0 yrs exp, sedan, ₹10/km
+4. Pushpendra Yadav 0 yrs exp, hatchback, ₹8/km
+5. Kamod Kumar 5 yrs exp, hatchback, ₹10/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi (filtered by: vehicle types: ['suv'], married: True, available for part time full time: True):
+
+1. Bharat Singh 0 yrs exp, sedan, ₹12/km
+2. Kapil 0 yrs exp, suv, ₹15/km
+3. Ravi 0 yrs exp, sedan, ₹10/km
+4. Pushpendra Yadav 0 yrs exp, hatchback, ₹8/km
+5. Kamod Kumar 5 yrs exp, hatchback, ₹10/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: tell me about eavi
+🚗 Agent: 2025-08-06 18:48:07,111 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:48:07,113 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:48:09,765 - INFO - Classified intent as: driver_info_intent
+state city: delhi
+DEBUG: Routing intent 'driver_info_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:48:09,769 - INFO - Executing GetDriverInfoNode...
+2025-08-06 18:48:11,366 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:48:11,369 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:48:11,370 - INFO - Generated AI Response: Ravi is 28 years old from Ratlam, Madhya Pradesh with 0 years of experience. He drives vehicle_type: sedan vehicle_model: DZIRE VXI CNG cost per km: 10.0 images: ['https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520555130.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=BDm6oOdhOHVTRy70ILunUU7Yx4nbdot%2Fou3c7Lh2G8Dm5vKDGdRJubBh2JX89gwyTdFDXPFZ9dV52nFg31mxZXJhzyqXwz2sN3EYifYtkbEED235%2F03ANG1wqXXHRLilDCpXa7HjdQ0Am9pyzupGa123UsSd0j7xgc09jVbRe3RrbSXXenBjLUGyW5qay%2B1Y1MSnqsI3NkV3YqMlWSehf2fEDiKMGB33SwcTIc7qk7%2FCfI11%2FHIO0FJ%2FkXcGyGQcHaZyhzIB1wWR0ZYC%2BOzNikm5VMTK%2Bwk0RMV6bBaLxxEYb7vuC%2FEGcRyqolQ7o5UgJXafVHwtghcfOH5alesGhg%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520571806.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=j1olEruFclkXQJe6UFv%2F1ChK516D5T9MBg3yeXG9XbcR6nkEZKBb19yZeHo%2FmTggVMCHoZRCZOIxwiy9gQvdoAjCL62DT4tPcq5108S40l6kaakMM4doLML1i%2BIALI15TAX%2Fj3R3PwlSzhffp1fFDk5a5mLt2kvEHB3BxnqScIv8pRwXZuJ6E3fnsJaCI7jtLXFPktsHelIF264dax9w190OkCqPycDFvPVx%2BGynPPHFioMK3JWGMsLxHWViH8hLNQr5UgCYug3KRV4zVY8%2FAAWeFfLLz7mf8FMx0Ym3IQ7qNjBee4Q2%2F02nHOOVqHKTVRYn%2FDzXgEX%2FHOikDdRqtw%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520636746.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=GXaWV9Lu2PPd%2Fq0Mh%2B%2BonbQOrruXTgklrLQTGp%2Fz%2BSEvzIcdWoDzKxk50wK8GaBj1oF5gyg7TuwE%2FvX%2FglJ94YETibpr78Fum%2BuHqUuCA7e1oi0BAhijy%2B0u%2BqT2BY5lRafmOwR3LAL86uIpvq%2Fz%2FQxdhprGZnBHDlOkpl1OOZyrkOjxlUuu2e2J6pkiXbrrM6C2Ae1A4xkm7Fd938a0GqYkXmZPGCk%2F9P5TD5WIkZBC9qNUGR3H4YhdBxbuy4vFK%2F9b2uLo%2Bqhym9ymhC9s7g5nDShaIvU3qSoTRv%2BIM5K%2B951giF9fd1E6WN%2B6AhO2MwUe6n9M2S0cArfvIGI5wA%3D%3D'] and charges around ₹10.0 per km. He speaks English, Hindi and doesn't allow pets.
+
+📞 Contact: +919039538715
+👤 Profile: https://cabswale.ai/profile/partner200k
+Ravi is 28 years old from Ratlam, Madhya Pradesh with 0 years of experience. He drives vehicle_type: sedan vehicle_model: DZIRE VXI CNG cost per km: 10.0 images: ['https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520555130.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=BDm6oOdhOHVTRy70ILunUU7Yx4nbdot%2Fou3c7Lh2G8Dm5vKDGdRJubBh2JX89gwyTdFDXPFZ9dV52nFg31mxZXJhzyqXwz2sN3EYifYtkbEED235%2F03ANG1wqXXHRLilDCpXa7HjdQ0Am9pyzupGa123UsSd0j7xgc09jVbRe3RrbSXXenBjLUGyW5qay%2B1Y1MSnqsI3NkV3YqMlWSehf2fEDiKMGB33SwcTIc7qk7%2FCfI11%2FHIO0FJ%2FkXcGyGQcHaZyhzIB1wWR0ZYC%2BOzNikm5VMTK%2Bwk0RMV6bBaLxxEYb7vuC%2FEGcRyqolQ7o5UgJXafVHwtghcfOH5alesGhg%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520571806.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=j1olEruFclkXQJe6UFv%2F1ChK516D5T9MBg3yeXG9XbcR6nkEZKBb19yZeHo%2FmTggVMCHoZRCZOIxwiy9gQvdoAjCL62DT4tPcq5108S40l6kaakMM4doLML1i%2BIALI15TAX%2Fj3R3PwlSzhffp1fFDk5a5mLt2kvEHB3BxnqScIv8pRwXZuJ6E3fnsJaCI7jtLXFPktsHelIF264dax9w190OkCqPycDFvPVx%2BGynPPHFioMK3JWGMsLxHWViH8hLNQr5UgCYug3KRV4zVY8%2FAAWeFfLLz7mf8FMx0Ym3IQ7qNjBee4Q2%2F02nHOOVqHKTVRYn%2FDzXgEX%2FHOikDdRqtw%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520636746.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=GXaWV9Lu2PPd%2Fq0Mh%2B%2BonbQOrruXTgklrLQTGp%2Fz%2BSEvzIcdWoDzKxk50wK8GaBj1oF5gyg7TuwE%2FvX%2FglJ94YETibpr78Fum%2BuHqUuCA7e1oi0BAhijy%2B0u%2BqT2BY5lRafmOwR3LAL86uIpvq%2Fz%2FQxdhprGZnBHDlOkpl1OOZyrkOjxlUuu2e2J6pkiXbrrM6C2Ae1A4xkm7Fd938a0GqYkXmZPGCk%2F9P5TD5WIkZBC9qNUGR3H4YhdBxbuy4vFK%2F9b2uLo%2Bqhym9ymhC9s7g5nDShaIvU3qSoTRv%2BIM5K%2B951giF9fd1E6WN%2B6AhO2MwUe6n9M2S0cArfvIGI5wA%3D%3D'] and charges around ₹10.0 per km. He speaks English, Hindi and doesn't allow pets.
+
+📞 Contact: +919039538715
+👤 Profile: https://cabswale.ai/profile/partner200k
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: does he have a sedan?
+🚗 Agent: 2025-08-06 18:48:44,378 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:48:44,381 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:48:45,739 - INFO - Classified intent as: driver_info_intent
+state city: delhi
+DEBUG: Routing intent 'driver_info_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:48:45,742 - INFO - Executing GetDriverInfoNode...
+2025-08-06 18:48:47,250 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:48:47,253 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:48:47,253 - INFO - Generated AI Response: Yes, Ravi drives a sedan.
+Yes, Ravi drives a sedan.
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: give me his contact info
+🚗 Agent: 2025-08-06 18:49:15,330 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:49:15,332 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:49:16,540 - INFO - Classified intent as: driver_info_intent
+state city: delhi
+DEBUG: Routing intent 'driver_info_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:49:16,541 - INFO - Executing GetDriverInfoNode...
+2025-08-06 18:49:18,136 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:49:18,139 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:49:18,140 - INFO - Generated AI Response: Ravi is 28 years old from Ratlam, Madhya Pradesh with 0 years of experience. He drives vehicle_type: sedan vehicle_model: DZIRE VXI CNG cost per km: 10.0 images: ['https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520555130.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=BDm6oOdhOHVTRy70ILunUU7Yx4nbdot%2Fou3c7Lh2G8Dm5vKDGdRJubBh2JX89gwyTdFDXPFZ9dV52nFg31mxZXJhzyqXwz2sN3EYifYtkbEED235%2F03ANG1wqXXHRLilDCpXa7HjdQ0Am9pyzupGa123UsSd0j7xgc09jVbRe3RrbSXXenBjLUGyW5qay%2B1Y1MSnqsI3NkV3YqMlWSehf2fEDiKMGB33SwcTIc7qk7%2FCfI11%2FHIO0FJ%2FkXcGyGQcHaZyhzIB1wWR0ZYC%2BOzNikm5VMTK%2Bwk0RMV6bBaLxxEYb7vuC%2FEGcRyqolQ7o5UgJXafVHwtghcfOH5alesGhg%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520571806.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=j1olEruFclkXQJe6UFv%2F1ChK516D5T9MBg3yeXG9XbcR6nkEZKBb19yZeHo%2FmTggVMCHoZRCZOIxwiy9gQvdoAjCL62DT4tPcq5108S40l6kaakMM4doLML1i%2BIALI15TAX%2Fj3R3PwlSzhffp1fFDk5a5mLt2kvEHB3BxnqScIv8pRwXZuJ6E3fnsJaCI7jtLXFPktsHelIF264dax9w190OkCqPycDFvPVx%2BGynPPHFioMK3JWGMsLxHWViH8hLNQr5UgCYug3KRV4zVY8%2FAAWeFfLLz7mf8FMx0Ym3IQ7qNjBee4Q2%2F02nHOOVqHKTVRYn%2FDzXgEX%2FHOikDdRqtw%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520636746.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=GXaWV9Lu2PPd%2Fq0Mh%2B%2BonbQOrruXTgklrLQTGp%2Fz%2BSEvzIcdWoDzKxk50wK8GaBj1oF5gyg7TuwE%2FvX%2FglJ94YETibpr78Fum%2BuHqUuCA7e1oi0BAhijy%2B0u%2BqT2BY5lRafmOwR3LAL86uIpvq%2Fz%2FQxdhprGZnBHDlOkpl1OOZyrkOjxlUuu2e2J6pkiXbrrM6C2Ae1A4xkm7Fd938a0GqYkXmZPGCk%2F9P5TD5WIkZBC9qNUGR3H4YhdBxbuy4vFK%2F9b2uLo%2Bqhym9ymhC9s7g5nDShaIvU3qSoTRv%2BIM5K%2B951giF9fd1E6WN%2B6AhO2MwUe6n9M2S0cArfvIGI5wA%3D%3D'] and charges around ₹10.0 per km. He speaks English, Hindi and doesn't allow pets.
+
+📞 Contact: +919039538715
+👤 Profile: https://cabswale.ai/profile/partner200k
+Ravi is 28 years old from Ratlam, Madhya Pradesh with 0 years of experience. He drives vehicle_type: sedan vehicle_model: DZIRE VXI CNG cost per km: 10.0 images: ['https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520555130.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=BDm6oOdhOHVTRy70ILunUU7Yx4nbdot%2Fou3c7Lh2G8Dm5vKDGdRJubBh2JX89gwyTdFDXPFZ9dV52nFg31mxZXJhzyqXwz2sN3EYifYtkbEED235%2F03ANG1wqXXHRLilDCpXa7HjdQ0Am9pyzupGa123UsSd0j7xgc09jVbRe3RrbSXXenBjLUGyW5qay%2B1Y1MSnqsI3NkV3YqMlWSehf2fEDiKMGB33SwcTIc7qk7%2FCfI11%2FHIO0FJ%2FkXcGyGQcHaZyhzIB1wWR0ZYC%2BOzNikm5VMTK%2Bwk0RMV6bBaLxxEYb7vuC%2FEGcRyqolQ7o5UgJXafVHwtghcfOH5alesGhg%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520571806.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=j1olEruFclkXQJe6UFv%2F1ChK516D5T9MBg3yeXG9XbcR6nkEZKBb19yZeHo%2FmTggVMCHoZRCZOIxwiy9gQvdoAjCL62DT4tPcq5108S40l6kaakMM4doLML1i%2BIALI15TAX%2Fj3R3PwlSzhffp1fFDk5a5mLt2kvEHB3BxnqScIv8pRwXZuJ6E3fnsJaCI7jtLXFPktsHelIF264dax9w190OkCqPycDFvPVx%2BGynPPHFioMK3JWGMsLxHWViH8hLNQr5UgCYug3KRV4zVY8%2FAAWeFfLLz7mf8FMx0Ym3IQ7qNjBee4Q2%2F02nHOOVqHKTVRYn%2FDzXgEX%2FHOikDdRqtw%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520636746.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=GXaWV9Lu2PPd%2Fq0Mh%2B%2BonbQOrruXTgklrLQTGp%2Fz%2BSEvzIcdWoDzKxk50wK8GaBj1oF5gyg7TuwE%2FvX%2FglJ94YETibpr78Fum%2BuHqUuCA7e1oi0BAhijy%2B0u%2BqT2BY5lRafmOwR3LAL86uIpvq%2Fz%2FQxdhprGZnBHDlOkpl1OOZyrkOjxlUuu2e2J6pkiXbrrM6C2Ae1A4xkm7Fd938a0GqYkXmZPGCk%2F9P5TD5WIkZBC9qNUGR3H4YhdBxbuy4vFK%2F9b2uLo%2Bqhym9ymhC9s7g5nDShaIvU3qSoTRv%2BIM5K%2B951giF9fd1E6WN%2B6AhO2MwUe6n9M2S0cArfvIGI5wA%3D%3D'] and charges around ₹10.0 per km. He speaks English, Hindi and doesn't allow pets.
+
+📞 Contact: +919039538715
+👤 Profile: https://cabswale.ai/profile/partner200k
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: find me his image
+🚗 Agent: 2025-08-06 18:50:13,223 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:50:13,225 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:50:14,410 - INFO - Classified intent as: driver_info_intent
+state city: delhi
+DEBUG: Routing intent 'driver_info_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:50:14,411 - INFO - Executing GetDriverInfoNode...
+2025-08-06 18:50:15,755 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:50:15,759 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:50:15,759 - INFO - Generated AI Response: Here are the images for Ravi's vehicle: ['https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520555130.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=BDm6oOdhOHVTRy70ILunUU7Yx4nbdot%2Fou3c7Lh2G8Dm5vKDGdRJubBh2JX89gwyTdFDXPFZ9dV52nFg31mxZXJhzyqXwz2sN3EYifYtkbEED235%2F03ANG1wqXXHRLilDCpXa7HjdQ0Am9pyzupGa123UsSd0j7xgc09jVbRe3RrbSXXenBjLUGyW5qay%2B1Y1MSnqsI3NkV3YqMlWSehf2fEDiKMGB33SwcTIc7qk7%2FCfI11%2FHIO0FJ%2FkXcGyGQcHaZyhzIB1wWR0ZYC%2BOzNikm5VMTK%2Bwk0RMV6bBaLxxEYb7vuC%2FEGcRyqolQ7o5UgJXafVHwtghcfOH5alesGhg%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520571806.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=j1olEruFclkXQJe6UFv%2F1ChK516D5T9MBg3yeXG9XbcR6nkEZKBb19yZeHo%2FmTggVMCHoZRCZOIxwiy9gQvdoAjCL62DT4tPcq5108S40l6kaakMM4doLML1i%2BIALI15TAX%2Fj3R3PwlSzhffp1fFDk5a5mLt2kvEHB3BxnqScIv8pRwXZuJ6E3fnsJaCI7jtLXFPktsHelIF264dax9w190OkCqPycDFvPVx%2BGynPPHFioMK3JWGMsLxHWViH8hLNQr5UgCYug3KRV4zVY8%2FAAWeFfLLz7mf8FMx0Ym3IQ7qNjBee4Q2%2F02nHOOVqHKTVRYn%2FDzXgEX%2FHOikDdRqtw%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520636746.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=GXaWV9Lu2PPd%2Fq0Mh%2B%2BonbQOrruXTgklrLQTGp%2Fz%2BSEvzIcdWoDzKxk50wK8GaBj1oF5gyg7TuwE%2FvX%2FglJ94YETibpr78Fum%2BuHqUuCA7e1oi0BAhijy%2B0u%2BqT2BY5lRafmOwR3LAL86uIpvq%2Fz%2FQxdhprGZnBHDlOkpl1OOZyrkOjxlUuu2e2J6pkiXbrrM6C2Ae1A4xkm7Fd938a0GqYkXmZPGCk%2F9P5TD5WIkZBC9qNUGR3H4YhdBxbuy4vFK%2F9b2uLo%2Bqhym9ymhC9s7g5nDShaIvU3qSoTRv%2BIM5K%2B951giF9fd1E6WN%2B6AhO2MwUe6n9M2S0cArfvIGI5wA%3D%3D']
+Here are the images for Ravi's vehicle: ['https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520555130.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=BDm6oOdhOHVTRy70ILunUU7Yx4nbdot%2Fou3c7Lh2G8Dm5vKDGdRJubBh2JX89gwyTdFDXPFZ9dV52nFg31mxZXJhzyqXwz2sN3EYifYtkbEED235%2F03ANG1wqXXHRLilDCpXa7HjdQ0Am9pyzupGa123UsSd0j7xgc09jVbRe3RrbSXXenBjLUGyW5qay%2B1Y1MSnqsI3NkV3YqMlWSehf2fEDiKMGB33SwcTIc7qk7%2FCfI11%2FHIO0FJ%2FkXcGyGQcHaZyhzIB1wWR0ZYC%2BOzNikm5VMTK%2Bwk0RMV6bBaLxxEYb7vuC%2FEGcRyqolQ7o5UgJXafVHwtghcfOH5alesGhg%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520571806.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=j1olEruFclkXQJe6UFv%2F1ChK516D5T9MBg3yeXG9XbcR6nkEZKBb19yZeHo%2FmTggVMCHoZRCZOIxwiy9gQvdoAjCL62DT4tPcq5108S40l6kaakMM4doLML1i%2BIALI15TAX%2Fj3R3PwlSzhffp1fFDk5a5mLt2kvEHB3BxnqScIv8pRwXZuJ6E3fnsJaCI7jtLXFPktsHelIF264dax9w190OkCqPycDFvPVx%2BGynPPHFioMK3JWGMsLxHWViH8hLNQr5UgCYug3KRV4zVY8%2FAAWeFfLLz7mf8FMx0Ym3IQ7qNjBee4Q2%2F02nHOOVqHKTVRYn%2FDzXgEX%2FHOikDdRqtw%3D%3D', 'https://storage.googleapis.com/bwi-cabswalle.appspot.com/cabswaleDrivers/XozsTG1v2rZT37uEtGxUbb9Zy2U2/vehicles/full_1753520636746.jpg?GoogleAccessId=firebase-adminsdk-fgy4m%40bwi-cabswalle.iam.gserviceaccount.com&Expires=16730323200&Signature=GXaWV9Lu2PPd%2Fq0Mh%2B%2BonbQOrruXTgklrLQTGp%2Fz%2BSEvzIcdWoDzKxk50wK8GaBj1oF5gyg7TuwE%2FvX%2FglJ94YETibpr78Fum%2BuHqUuCA7e1oi0BAhijy%2B0u%2BqT2BY5lRafmOwR3LAL86uIpvq%2Fz%2FQxdhprGZnBHDlOkpl1OOZyrkOjxlUuu2e2J6pkiXbrrM6C2Ae1A4xkm7Fd938a0GqYkXmZPGCk%2F9P5TD5WIkZBC9qNUGR3H4YhdBxbuy4vFK%2F9b2uLo%2Bqhym9ymhC9s7g5nDShaIvU3qSoTRv%2BIM5K%2B951giF9fd1E6WN%2B6AhO2MwUe6n9M2S0cArfvIGI5wA%3D%3D']
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: and his experience?
+🚗 Agent: 2025-08-06 18:50:28,614 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:50:28,615 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:50:29,949 - INFO - Classified intent as: driver_info_intent
+state city: delhi
+DEBUG: Routing intent 'driver_info_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:50:29,952 - INFO - Executing GetDriverInfoNode...
+2025-08-06 18:50:31,608 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:50:31,611 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:50:31,611 - INFO - Generated AI Response: Ravi has 0 years of experience.
+Ravi has 0 years of experience.
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: ok tell me what bharat drives
+🚗 Agent: 2025-08-06 18:50:54,249 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:50:54,251 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:50:55,570 - INFO - Classified intent as: driver_info_intent
+state city: delhi
+DEBUG: Routing intent 'driver_info_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:50:55,574 - INFO - Executing GetDriverInfoNode...
+2025-08-06 18:50:56,792 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:50:56,795 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:50:56,796 - INFO - Generated AI Response: Bharat Singh is 33 years old from Bharatpur, Rajasthan with 0 years of experience. He drives vehicle_type: sedan vehicle_model: DZIRE VXI CNG cost per km: 12.0 images: ['https://firebasestorage.googleapis.com/v0/b/bwi-cabswalle.appspot.com/o/cabswaleDrivers%2FTg0vj7UrF7QV8flGZhX7HNDD4SP2%2Fvehicles%2Ffull_1750135791449__userId__Tg0vj7UrF7QV8flGZhX7HNDD4SP2_1000071579.jpg?alt=media&token=a2744ad9-5624-4a1e-97d5-8d7e8ea1983a', 'https://firebasestorage.googleapis.com/v0/b/bwi-cabswalle.appspot.com/o/cabswaleDrivers%2FTg0vj7UrF7QV8flGZhX7HNDD4SP2%2Fvehicles%2Ffull_1750135831917__userId__Tg0vj7UrF7QV8flGZhX7HNDD4SP2_1000071582.jpg?alt=media&token=c9884618-82a4-4cbb-9dc6-fc8926f4b91a', 'https://firebasestorage.googleapis.com/v0/b/bwi-cabswalle.appspot.com/o/cabswaleDrivers%2FTg0vj7UrF7QV8flGZhX7HNDD4SP2%2Fvehicles%2Ffull_1750135903513__userId__Tg0vj7UrF7QV8flGZhX7HNDD4SP2_1000065712.jpg?alt=media&token=0cdd1e88-dc40-4de9-b628-9a0de15b24c5'] and charges around ₹12.0 per km. He speaks not specified and doesn't allow pets.
+
+📞 Contact: +918955059093
+👤 Profile: https://cabswale.ai/profile/bharatsingh-7
+Bharat Singh is 33 years old from Bharatpur, Rajasthan with 0 years of experience. He drives vehicle_type: sedan vehicle_model: DZIRE VXI CNG cost per km: 12.0 images: ['https://firebasestorage.googleapis.com/v0/b/bwi-cabswalle.appspot.com/o/cabswaleDrivers%2FTg0vj7UrF7QV8flGZhX7HNDD4SP2%2Fvehicles%2Ffull_1750135791449__userId__Tg0vj7UrF7QV8flGZhX7HNDD4SP2_1000071579.jpg?alt=media&token=a2744ad9-5624-4a1e-97d5-8d7e8ea1983a', 'https://firebasestorage.googleapis.com/v0/b/bwi-cabswalle.appspot.com/o/cabswaleDrivers%2FTg0vj7UrF7QV8flGZhX7HNDD4SP2%2Fvehicles%2Ffull_1750135831917__userId__Tg0vj7UrF7QV8flGZhX7HNDD4SP2_1000071582.jpg?alt=media&token=c9884618-82a4-4cbb-9dc6-fc8926f4b91a', 'https://firebasestorage.googleapis.com/v0/b/bwi-cabswalle.appspot.com/o/cabswaleDrivers%2FTg0vj7UrF7QV8flGZhX7HNDD4SP2%2Fvehicles%2Ffull_1750135903513__userId__Tg0vj7UrF7QV8flGZhX7HNDD4SP2_1000065712.jpg?alt=media&token=0cdd1e88-dc40-4de9-b628-9a0de15b24c5'] and charges around ₹12.0 per km. He speaks not specified and doesn't allow pets.
+
+📞 Contact: +918955059093
+👤 Profile: https://cabswale.ai/profile/bharatsingh-7
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: confirm with him
+🚗 Agent: 2025-08-06 18:51:13,579 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:51:13,580 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:51:14,829 - INFO - Classified intent as: booking_or_confirmation_intent
+state city: delhi
+DEBUG: Routing intent 'booking_or_confirmation_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:51:14,832 - INFO - Executing BookDriverNode...
+2025-08-06 18:51:14,833 - INFO - Booking with pre-selected driver: Bharat Singh
+2025-08-06 18:51:14,838 - INFO - Cache hit for key: 199125eb-3711-4ea6-8385-628cc3eba237_delhi_1
+2025-08-06 18:51:14,841 - INFO - Successfully retrieved booking details for driver Bharat Singh.
+2025-08-06 18:51:14,843 - INFO - Executing ResponseGeneratorNode...
+2025-08-06 18:51:14,843 - INFO - Generated AI Response: 🎉 Great! Your booking with Bharat Singh is confirmed!
+
+📞 Contact Number: +918955059093
+👤 Profile:
+
+✅ The driver will contact you soon for pickup details. Have a safe trip!
+🎉 Great! Your booking with Bharat Singh is confirmed!
+
+📞 Contact Number: +918955059093
+👤 Profile:
+
+✅ The driver will contact you soon for pickup details. Have a safe trip!
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: give me drivers who have smoking allowed
+🚗 Agent: 2025-08-06 18:53:01,323 - INFO - Executing InitializeAgentNode...
+2025-08-06 18:53:01,325 - INFO - Executing ClassifyIntentNode...
+2025-08-06 18:53:02,897 - INFO - Classified intent as: filter_intent
+state city: delhi
+DEBUG: Routing intent 'filter_intent' with search_city: delhi, drivers: 5
+2025-08-06 18:53:02,901 - INFO - Executing FilterDriversNode...
+2025-08-06 18:53:04,200 - WARNING - Filter intent classified, but no specific filters were extracted.
+2025-08-06 18:53:04,202 - INFO - Executing ResponseGeneratorNode...
+I understand you want to filter, but I'm not sure what criteria to use. Could you please be more specific?
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: ^Cexit
+🚗 Agent: Thank you for using our cab booking service! Have a great day!
+
+Exiting...
+ajay57 in ~/Projects/py/b69 on main ● λ

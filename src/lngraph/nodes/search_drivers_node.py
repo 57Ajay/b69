@@ -82,10 +82,12 @@ class SearchDriversNode:
 
         # 3. Call the search tool
         try:
+            # For a new search, always start at page 1
+            current_page = 1
             tool_response = await self.driver_tools.search_drivers_tool.ainvoke({
                 "city": city,
-                "page": state["current_page"],
-                "limit": state["limit"],
+                "page": current_page,
+                "limit": state["limit"], # Use limit from state (e.g., 5)
             })
 
             if tool_response.get("success"):
@@ -94,18 +96,20 @@ class SearchDriversNode:
 
                 logger.info(f"Successfully found {driver_count} drivers.")
 
-                # CRITICAL: Store both current and all drivers
+                # CRITICAL: Reset state for a new search
                 return {
                     "search_city": city,
-                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],  # Currently displayed drivers
-                    "all_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],      # ALL drivers (preserved for filtering)
+                    "current_page": current_page,
+                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
+                    "all_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
                     "total_results": tool_response.get("total", 0),
                     "has_more_results": tool_response.get("has_more", False),
-                    "last_error": None,
                     "is_filtered": False,
                     "active_filters": {},
                     "selected_driver": None,
                     "driver_summary": None,
+                    "last_error": None,
+                    "failed_node": None,
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while searching.')

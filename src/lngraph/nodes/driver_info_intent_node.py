@@ -5,7 +5,7 @@ from langchain_google_vertexai import ChatVertexAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from src.lngraph.tools.driver_tools import DriverTools
-from src.models.drivers_model import APIResponse, DriverModel
+from src.models.drivers_model import DriverModel
 
 logger = logging.getLogger(__name__)
 
@@ -74,22 +74,8 @@ class GetDriverInfoNode:
         """
         logger.info("Executing GetDriverInfoNode...")
 
-        full_trip_details = state["full_trip_details"]
-        pickup = state["pickupLocation"]
-        dropoff = state["dropLocation"]
-        trip_type = state["trip_type"]
-        trip_duration = state["trip_duration"] if trip_type =="round_trip" else None
-        if not full_trip_details:
-            return {
-                "last_error": f"I don't have any trip details to book. Please provide trip details first\
-                pickup: {pickup}, dropoff: {dropoff}, trip_type: {trip_type}, and trip_duration: {trip_duration} if trip type is round trip",
-                "failed_node": "driver_info_intent_node"
-            }
-
-
         user_message = state["last_user_message"]
 
-        # Check if we have search_city in state
         if not state.get("search_city"):
             logger.warning("No search city in state for driver info request.")
             return {
@@ -97,50 +83,11 @@ class GetDriverInfoNode:
                 "failed_node": "get_driver_info_node"
             }
 
-        # CRITICAL: Get drivers from current_drivers (which includes filtered results)
-        # But fallback to all_drivers if current_drivers is empty
-        available_drivers = state["current_drivers"] if state["current_drivers"] else []
+        # Use all_drivers for broader context, as current_drivers might be a paginated subset
+        available_drivers = state.get("all_drivers", [])
 
         if not available_drivers:
-            available_drivers = state["all_drivers"] if state["all_drivers"] is not None else []
-
-        if not available_drivers:
-            # Try to get from cache as last resort
-            cache_key = self.driver_tools.api_client._generate_cache_key(
-                str(state["search_city"]),
-                state["current_page"]
-            )
-
-            try:
-                cached_data = await self.driver_tools.api_client._get_from_cache(cache_key)
-                if cached_data is None:
-                    logger.warning("No drivers in cache to get info for.")
-                    return {
-                        "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
-                        "failed_node": "get_driver_info_node"
-                    }
-
-                # Get ALL drivers from cache
-                api_response = APIResponse.model_validate(cached_data)
-                available_drivers_with_full_information = api_response.data
-
-                for driver in available_drivers_with_full_information:
-                    # Process each driver's information here
-                    driver_data_for_state = DriverDetailsForState(
-                        driver_id=driver.id,
-                        driver_name=driver.name,
-                    )
-                    available_drivers.append(driver_data_for_state)
-
-            except Exception as e:
-                logger.error(f"Error retrieving drivers from cache: {e}")
-                return {
-                    "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
-                    "failed_node": "get_driver_info_node"
-                }
-
-        if not available_drivers:
-            logger.warning("No drivers available for info request.")
+            logger.warning("No drivers available in the state for info request.")
             return {
                 "last_error": "I don't have a list of drivers to choose from. Please perform a search first.",
                 "failed_node": "get_driver_info_node"
@@ -148,7 +95,7 @@ class GetDriverInfoNode:
 
         # 1. Extract which driver the user is asking about
         extract_prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an entity extraction expert. From the user's message, identify the driver they are asking about. They might use a name, an index (e.g., 'the first one', 'the second driver'), or pronouns referring to a previously discussed driver. Extract either the name or the 1-based index. Return null for fields not mentioned."),
+            ("system", "You are an entity extraction expert. From the user's message, identify the driver they are asking about. They might use a name. Extract the name if mentioned."),
             ("human", "Available driver names: {driver_names}\n\nUser Message: {user_message}")
         ])
 
@@ -167,81 +114,57 @@ class GetDriverInfoNode:
 
         # 2. Find the driver from the identifier
         target_driver = None
-
         if identifier.driver_name:
             target_driver = self._find_driver_by_name(available_drivers, identifier.driver_name)
 
-
-        # Fallback: If no identifier extracted, try to find from the current selected driver
         if not target_driver and state.get("selected_driver"):
             target_driver = state["selected_driver"]
 
         if not target_driver:
-            logger.warning(f"Could not find a matching driver for identifier: {identifier.model_dump_json()}")
-            available_names = ", ".join([driver["driver_name"] for driver in available_drivers[:5]])  # Show first 5 names
+            available_names = ", ".join([driver["driver_name"] for driver in available_drivers[:5]])
             return {
                 "last_error": f"I couldn't find that specific driver. Available drivers include: {available_names}. Please try again.",
                 "failed_node": "get_driver_info_node"
             }
 
-        # logger.info(f"Found driver details for: {target_driver['driver_name']}, {target_driver['driver_id']}")
-
-        # 3. Return the complete driver information using the driver model schema
+        # 3. Fetch full driver details
         try:
+            # Determine the page where the driver might be found. This is a simplification;
+            # a more robust solution might need to iterate pages or have a better lookup mechanism.
+            page_to_check = state.get("current_page", 1)
+
             full_driver_info = await self.driver_tools.get_driver_info_tool.ainvoke({
                 "city": state["search_city"],
-                "page": state["current_page"],
+                "page": page_to_check,
                 "driverId": target_driver["driver_id"],
             })
 
-            print("\n------------\n")
-            logger.info("Success: ", full_driver_info)
-            print("\n------------\n")
-            if not full_driver_info["success"]:
+            if not full_driver_info.get("success"):
                 return {
-                    "last_error": f"Failed to retrieve driver information: {full_driver_info.msg}",
+                    "last_error": f"Failed to retrieve driver information: {full_driver_info.get('msg', 'Unknown error')}",
                     "failed_node": "get_driver_info_node"
                 }
 
             driver_info: DriverModel = full_driver_info["driver"]
 
-            vehicle_info = []
+            vehicle_info = [
+                f"vehicle_type: {v.vehicle_type} vehicle_model: {v.model} cost per km: {v.per_km_cost} images: {[img.full.url for img in v.images if img.full]}"
+                for v in driver_info.verified_vehicles
+            ]
 
-            for vehicle in driver_info.verified_vehicles:
-                vehicle_detail = f"vehicle_type: {vehicle.vehicle_type}"
-                if hasattr(vehicle, "model") and vehicle.model:
-                    vehicle_detail += f" vehicle_model:  {vehicle.model}"
-                vehicle_info.append(vehicle_detail)
-                if hasattr(vehicle, "per_km_cost") and vehicle.per_km_cost:
-                    vehicle_detail += f" cost per km: {vehicle.per_km_cost}"
-                if hasattr(vehicle, "fuel_type") and vehicle.fuel_type:
-                    vehicle_detail += f" fuel_type: {vehicle.fuel_type}"
-                if hasattr(vehicle, "reg_no") and vehicle.reg_no:
-                    vehicle_detail += f" reg_no: {vehicle.reg_no}"
-                if hasattr(vehicle, "images") and vehicle.images:
-                    images = [(image.full.url if image.full is not None else "not available") for image in vehicle.images]
-                    vehicle_detail += f" images: {images}"
-                vehicle_info.append(vehicle_detail)
-
-
-            # Extract languages properly
-            languages =  driver_info.verified_languages
-
-            age = driver_info.age
             driver_summary = {
                 "name": driver_info.name,
-                "age": age if age is not None and age > 0  else "Not specified",
+                "age": driver_info.age,
                 "city": driver_info.city,
-                "experience": driver_info.experience,  # This should give the correct experience
+                "experience": driver_info.experience,
                 "vehicles": vehicle_info,
                 "phone": driver_info.phone_no,
                 "profile_url": driver_info.constructed_profile_url,
-                "languages": languages,
+                "languages": driver_info.verified_languages,
                 "pet_allowed": driver_info.is_pet_allowed,
-                "connections": driver_info.connections,
-                "gender": driver_info.gender,
                 "married": driver_info.married,
-                "per_km_cost": [cost.per_km_cost for cost in driver_info.verified_vehicles]
+                "gender": driver_info.gender,
+                "per_km_cost": [v.per_km_cost for v in driver_info.verified_vehicles],
             }
 
             return {
