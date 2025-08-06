@@ -19,6 +19,7 @@ class InitializeAgentNode:
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
         CRITICAL FIX: Only update last_user_message, preserve all other state.
+        Ensures that state variables are not reset unexpectedly.
 
         Args:
             state: The current state of the agent.
@@ -28,13 +29,24 @@ class InitializeAgentNode:
         """
         logger.info("Executing InitializeAgentNode...")
 
-        # CRITICAL: Only update the last user message, preserve everything else
+        # Get the last user message
+        last_message = ""
+        if state.get("messages") and len(state["messages"]) > 0:
+            last_message = state["messages"][-1].content
+
         updates = {
-            "last_user_message": state["messages"][-1].content if state.get("messages") else "",
+            "last_user_message": last_message,
         }
 
-        logger.debug(f"Preserving state for session {state.get('session_id')}")
-        logger.debug(f"Current search_city: {state.get('search_city')}")
-        logger.debug(f"Current drivers count: {len(state.get('current_drivers', []))}")
+        if state.get("last_error") and not state.get("search_city"):
+            updates["last_error"] = ""
+            updates["failed_node"] = ""
+
+        # logger.debug(f"Preserving state for session {state.get('session_id')}")
+        # logger.debug(f"Current search_city: {state.get('search_city')}")
+        # # logger.debug(f"Current drivers count: {len(state.get('current_drivers', []))}")
+        # # logger.debug(f"All drivers count: {len(state.get('all_drivers', []))}")
+        # logger.debug(f"Active filters: {state.get('active_filters', {})}")
+        # logger.debug(f"Is filtered: {state.get('is_filtered', False)}")
 
         return updates

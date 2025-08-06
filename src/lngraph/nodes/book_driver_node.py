@@ -1,6 +1,5 @@
-from typing import Dict, Any, Optional
-from src.models.drivers_model import APIResponse
-from src.models.agent_state_model import AgentState
+from typing import Dict, Any, Optional, List
+from src.models.agent_state_model import AgentState, DriverDetailsForState
 import logging
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -19,10 +18,8 @@ class DriverIdentifier(BaseModel):
         default=None,
         description="The name of the driver the user wants to book, e.g., 'Ramesh'."
     )
-    driver_index: Optional[int] = Field(
-        default=None,
-        description="The 1-based index of the driver in the list, e.g., 'book the first one' -> 1."
-    )
+
+
 
 class BookDriverNode:
     """
@@ -40,7 +37,7 @@ class BookDriverNode:
         self.llm = llm
         self.driver_tools = driver_tools
 
-    def _find_driver_by_name(self, drivers, search_name):
+    def _find_driver_by_name(self, drivers: List[DriverDetailsForState], search_name: str):
         """
         Find driver by name with fuzzy matching.
         """
@@ -48,17 +45,17 @@ class BookDriverNode:
 
         # First try exact match
         for driver in drivers:
-            if driver.name.lower() == search_name_lower:
+            if driver["driver_name"].lower() == search_name_lower:
                 return driver
 
         # Try partial match (driver name contains search term)
         for driver in drivers:
-            if search_name_lower in driver.name.lower():
+            if search_name_lower in driver["driver_name"].lower():
                 return driver
 
         # Try reverse partial match (search term contains driver name parts)
         for driver in drivers:
-            driver_name_parts = driver.name.lower().split()
+            driver_name_parts = driver["driver_name"].lower().split()
             for part in driver_name_parts:
                 if part in search_name_lower and len(part) > 2:  # Avoid matching very short words
                     return driver
@@ -76,6 +73,17 @@ class BookDriverNode:
             A dictionary with the updated state values.
         """
         logger.info("Executing BookDriverNode...")
+        full_trip_details = state["full_trip_details"]
+        pickup = state["pickupLocation"]
+        dropoff = state["dropLocation"]
+        trip_type = state["trip_type"]
+        trip_duration = state["trip_duration"] if trip_type =="round_trip" else None
+        if not full_trip_details:
+            return {
+                "last_error": f"I don't have any trip details to book. Please provide trip details first\
+                pickup: {pickup}, dropoff: {dropoff}, trip_type: {trip_type}, and trip_duration: {trip_duration} if trip type is round trip",
+                "failed_node": "book_driver_node"
+            }
 
         user_message = state["last_user_message"]
 
@@ -86,7 +94,7 @@ class BookDriverNode:
 
         # 1. Check if a driver is already selected in the state
         if selected_driver:
-            logger.info(f"Booking with pre-selected driver: {selected_driver.name}")
+            logger.info(f"Booking with pre-selected driver: {selected_driver['driver_name']}")
             target_driver = selected_driver
         elif not all_drivers:
             logger.warning("Booking intent detected without any drivers in context.")
@@ -102,7 +110,7 @@ class BookDriverNode:
                 ("human", "Available driver names: {driver_names}\n\nUser Message: {user_message}")
             ])
 
-            driver_names = [driver.name for driver in all_drivers]
+            driver_names = [driver["driver_name"] for driver in all_drivers]
             extract_chain = extract_prompt | self.llm.with_structured_output(DriverIdentifier)
 
             try:
@@ -114,8 +122,7 @@ class BookDriverNode:
 
                 if identifier.driver_name:
                     target_driver = self._find_driver_by_name(all_drivers, identifier.driver_name)
-                elif identifier.driver_index and 0 < identifier.driver_index <= len(all_drivers):
-                    target_driver = all_drivers[identifier.driver_index - 1]
+
 
                 # Fallback: If user says "book with him/her" and there's a recently selected driver
                 if not target_driver and selected_driver and any(word in user_message.lower() for word in ['him', 'her', 'them', 'that driver']):
@@ -125,30 +132,29 @@ class BookDriverNode:
                 logger.error(f"Error during driver identification for booking: {e}", exc_info=True)
                 return {"last_error": "I'm sorry, I couldn't understand which driver you want to book.", "failed_node": "book_driver_node"}
 
-        if not target_driver:
+        if not target_driver and all_drivers is not None:
             logger.warning("Could not find a matching driver to book.")
-            available_names = ", ".join([driver.name for driver in all_drivers[:3]])  # Show first 3 names
+            available_names = ", ".join([driver['driver_name'] for driver in all_drivers[:5]])  # Show first 3 names
             return {
                 "last_error": f"I couldn't find that specific driver to book. Available drivers include: {available_names}. Please be more specific.",
                 "failed_node": "book_driver_node"
             }
 
-        logger.info(f"Confirming booking with driver: {target_driver.name} (ID: {target_driver.id})")
 
         # 3. Call the tool to get booking confirmation details
         try:
             tool_response = await self.driver_tools.book_or_confirm_ride_with_driver.ainvoke({
                 "city": state["search_city"],
                 "page": state["current_page"],
-                "driverId": target_driver.id,
+                "driverId": target_driver['driver_id'] if target_driver else None,
             })
 
             if tool_response.get("success"):
-                logger.info(f"Successfully retrieved booking details for driver {target_driver.id}.")
+                logger.info(f"Successfully retrieved booking details for driver {target_driver['driver_name'] if target_driver else 'cabswale driver'}.")
                 return {
                     "booking_status": "confirmed",
                     "booking_details": tool_response,
-                    "selected_driver": target_driver,  # Store the selected driver
+                    "selected_driver": target_driver,
                     "last_error": None,
                 }
             else:

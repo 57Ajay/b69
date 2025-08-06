@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional, List
+from src.models.drivers_model import DriverModel
 from src.models.agent_state_model import AgentState
 import logging
 from langchain_google_vertexai import ChatVertexAI
@@ -21,7 +22,11 @@ class FilterEntities(BaseModel):
     min_experience: Optional[int] = Field(None, description="Minimum years of driving experience.")
     languages: Optional[List[str]] = Field(None, description="List of languages the driver speaks.")
     married: Optional[bool] = Field(None, description="The driver's marital status.")
-
+    clear_previous_filters: Optional[bool] = Field(None, description="Whether to clear all previous filters before applying new ones.")
+    allow_handicapped_persons: Optional[bool] = Field(None, description="Whether the driver allows handicapped persons.")
+    available_for_customers_personal_car: Optional[bool] = Field(None, description="Whether the driver is available for customers' personal cars.")
+    available_for_driving_in_event_wedding: Optional[bool] = Field(None, description="Whether the driver is available for driving in events like weddings.")
+    available_for_part_time_full_time: Optional[bool] = Field(None, description="Whether the driver is available for part-time or full-time work.")
 
 class FilterDriversNode:
     """
@@ -61,15 +66,21 @@ class FilterDriversNode:
                 "failed_node": "filter_drivers_node"
             }
 
-        # CRITICAL: Always use the original cache, not current filtered drivers
-        cache_key = self.driver_tools.api_client._generate_cache_key(
-            str(state["search_city"]),
-            state["current_page"]
-        )
-
         # 1. Extract filter criteria from the user's message
         extract_prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an entity extraction expert. From the user's message, extract any specified filters for a cab driver search. The user might mention vehicle types, gender, pet-friendliness, experience, or languages. Only extract the filters the user explicitly mentions."),
+            ("system", """You are an entity extraction expert. From the user's message, extract any specified filters for a cab driver search.
+
+            Pay special attention to:
+            - Vehicle types: sedan, suv, hatchback, luxury, etc.
+            - Gender: male, female
+            - Pet-friendliness: pets allowed, pet-friendly
+            - Experience: years of experience, minimum experience
+            - Languages: hindi, english, punjabi, etc.
+            - Marital status: married, single
+            - Filter management: "remove old filter", "clear previous", "reset filters"
+
+            If the user wants to clear or remove old filters, set clear_previous_filters to true.
+            Only extract the filters the user explicitly mentions."""),
             ("human", "User Message: {user_message}")
         ])
 
@@ -77,9 +88,13 @@ class FilterDriversNode:
 
         try:
             raw = await extract_chain.ainvoke({"user_message": user_message})
-            extracted_filters = FilterEntities.model_validate(raw).model_dump(exclude_unset=True)
+            extracted_filters = FilterEntities.model_validate(raw)
 
-            if not extracted_filters:
+            # Convert to dict, excluding unset values
+            filter_dict = extracted_filters.model_dump(exclude_unset=True)
+            clear_filters = filter_dict.pop("clear_previous_filters", False)
+
+            if not filter_dict and not clear_filters:
                 logger.warning("Filter intent classified, but no specific filters were extracted.")
                 return {"last_error": "I understand you want to filter, but I'm not sure what criteria to use. Could you please be more specific?"}
 
@@ -87,16 +102,17 @@ class FilterDriversNode:
             logger.error(f"Error during filter extraction: {e}", exc_info=True)
             return {"last_error": "I had trouble understanding your filter criteria. Could you please rephrase?", "failed_node": "filter_drivers_node"}
 
-        # 2. CRITICAL: For cumulative filtering, merge with existing filters
-        # But for new filter types, replace the old value
+        # 2. Handle filter management
         current_filters = state.get("active_filters", {})
-        updated_filters = {**current_filters}
 
-        # Replace or add each new filter
-        for key, value in extracted_filters.items():
-            updated_filters[key] = value
-
-        logger.info(f"Applying updated filters: {updated_filters}")
+        if clear_filters:
+            # Clear all previous filters and start fresh
+            updated_filters = filter_dict
+            logger.info(f"Clearing previous filters and applying new ones: {updated_filters}")
+        else:
+            # Merge with existing filters (new values override old ones)
+            updated_filters = {**current_filters, **filter_dict}
+            logger.info(f"Merging filters. Previous: {current_filters}, New: {filter_dict}, Combined: {updated_filters}")
 
         # 3. Call the tool to apply filters to the cached results
         try:
@@ -106,18 +122,27 @@ class FilterDriversNode:
                 "filter_obj": updated_filters,
             })
 
+            logger.info(f"Tool response:----------------------\n \n{tool_response}\n\n---------------------------")
+
             if tool_response.get("success"):
-                filtered_drivers = tool_response.get("filtered_drivers", [])
+                filtered_drivers: List[DriverModel] = tool_response.get("filtered_drivers", [])
                 logger.info(f"Successfully filtered drivers. Found {len(filtered_drivers)} matches.")
 
                 # CRITICAL: Don't lose the original drivers - keep them accessible
+                logger.info("Current Drivers: ",[{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers])
+
                 return {
-                    "current_drivers": filtered_drivers,
+                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers],
                     "active_filters": updated_filters,
                     "last_error": None,
                     # Keep track that we're in filtered mode
                     "is_filtered": True,
-                    "total_filtered_results": len(filtered_drivers)
+                    "total_filtered_results": len(filtered_drivers),
+                    # Clear any previous errors
+                    "failed_node": None,
+                    # CRITICAL: Clear previous driver selection when filtering
+                    "selected_driver": None,
+                    "driver_summary": None
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while filtering.')

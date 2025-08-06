@@ -1,6 +1,5 @@
-import operator
-from typing import TypedDict, Annotated
 from langgraph.graph import StateGraph, END
+from src.services.api_service import DriversAPIClient
 from src.models.agent_state_model import AgentState
 from src.lngraph.nodes.initialize_agent_node import InitializeAgentNode
 from src.lngraph.nodes.classify_intent_node import ClassifyIntentNode
@@ -13,14 +12,6 @@ from src.lngraph.nodes.trip_info_collection_node import TripInfoCollectionNode
 from langchain_google_vertexai import ChatVertexAI
 from src.lngraph.tools.driver_tools import DriverTools
 
-# --- Graph State and Message Reducer ---
-
-# This defines how messages are accumulated in the state.
-# `operator.add` ensures that new messages are appended to the existing list.
-class GraphState(TypedDict):
-    state: AgentState
-    messages: Annotated[list, operator.add]
-
 def route_after_intent_classification(state: AgentState):
     """
     CRITICAL: Enhanced router with strict state validation and proper flow control.
@@ -28,8 +19,11 @@ def route_after_intent_classification(state: AgentState):
     intent = state.get("intent")
     search_city = state.get("search_city")
     current_drivers = state.get("current_drivers", [])
+    all_drivers = state.get("all_drivers", [])
 
-    print(f"DEBUG: Routing intent '{intent}' with search_city: {search_city}, drivers: {len(current_drivers)}")
+    current_drivers_lenght = len(current_drivers) if current_drivers else 0
+
+    print(f"DEBUG: Routing intent '{intent}' with search_city: {search_city}, drivers: {current_drivers_lenght}")
 
     # Check if we have essential trip information for booking-related intents
     has_complete_trip_info = (
@@ -48,7 +42,8 @@ def route_after_intent_classification(state: AgentState):
         if not has_complete_trip_info:
             print("DEBUG: Missing trip info for booking, collecting trip info")
             return "collect_trip_info"
-        if not search_city or not current_drivers:
+        # CRITICAL: Check for available drivers (current OR all)
+        if not search_city or (not current_drivers and not all_drivers):
             print("DEBUG: No drivers available for booking, need to search first")
             return "search_drivers"
         return "book_driver"
@@ -60,16 +55,16 @@ def route_after_intent_classification(state: AgentState):
             return "collect_trip_info"
         return "search_drivers"
 
-    # CRITICAL: For driver info intent, MUST have existing drivers
+    # CRITICAL: For driver info intent, check for ANY available drivers
     if intent == "driver_info_intent":
-        if not search_city or not current_drivers:
+        if not search_city or (not current_drivers and not all_drivers):
             print("DEBUG: No drivers available for info request, asking to search first")
             return "generate_response"  # Will ask user to search first
         return "get_driver_info"
 
-    # For filter intent, MUST have existing drivers
+    # CRITICAL: For filter intent, check for ANY available drivers
     if intent == "filter_intent":
-        if not search_city or not current_drivers:
+        if not search_city or (not current_drivers and not all_drivers):
             print("DEBUG: No drivers available for filtering, asking to search first")
             return "generate_response"  # Will ask user to search first
         return "filter_drivers"
@@ -90,7 +85,16 @@ def route_after_trip_collection(state: AgentState):
         print("DEBUG: Trip info incomplete, generating response to ask for missing info")
         return "generate_response"
 
-def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools):
+def should_continue_conversation(state: AgentState):
+    """
+    Determines if the conversation should continue or end.
+    This allows for multi-turn conversations within a single graph execution.
+    """
+    # For now, we'll end after each response to maintain the single-turn pattern
+    # but this gives us the flexibility to continue if needed
+    return "end_conversation"
+
+def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools, api_client: DriversAPIClient):
     """
     Builds and compiles the LangGraph for the cab booking agent.
     """
@@ -103,7 +107,7 @@ def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools):
     get_driver_info_node = GetDriverInfoNode(llm, driver_tools)
     filter_drivers_node = FilterDriversNode(llm, driver_tools)
     book_driver_node = BookDriverNode(llm, driver_tools)
-    response_generator_node = ResponseGeneratorNode(llm)
+    response_generator_node = ResponseGeneratorNode(llm, api_client)
 
     # Define the graph
     workflow = StateGraph(AgentState)
@@ -156,8 +160,16 @@ def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools):
     workflow.add_edge("filter_drivers", "generate_response")
     workflow.add_edge("book_driver", "generate_response")
 
-    # 6. After generating a response, the conversation can end for this turn.
-    workflow.add_edge("generate_response", END)
+    # 6. FIXED: Instead of ending immediately, add a conditional check
+    workflow.add_conditional_edges(
+        "generate_response",
+        should_continue_conversation,
+        {
+            "end_conversation": END,
+            # We could add more paths here for multi-turn conversations
+            # "continue_conversation": "classify_intent"  # Example for continuing
+        }
+    )
 
     # Compile the graph into a runnable app
     app = workflow.compile()

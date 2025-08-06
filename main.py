@@ -37,7 +37,7 @@ async def main():
 
     # --- 2. Build the Agent Graph ---
     logger.info("Building the agent graph...")
-    app = create_agent_graph(llm, driver_tools)
+    app = create_agent_graph(llm, driver_tools, api_client)
 
     # --- 3. Run the CLI Chat Loop ---
     print("\n🚗 Cab Booking Agent is ready! Type 'exit' to end the conversation.")
@@ -61,7 +61,7 @@ async def main():
         "intent": None,
         "search_city": None,
         "current_page": 1,
-        "page_size": 10,
+        "limit": 10,
         "radius": 100,
         "search_strategy": "hybrid",
         "use_cache": True,
@@ -108,7 +108,7 @@ async def main():
                 print("🚗 Agent: Please tell me what you'd like to do.")
                 continue
 
-            # Append the new user message to the persistent state's history
+            # Append the new user message to the conversation state's message history
             conversation_state["messages"].append(HumanMessage(content=user_input))
 
             # Clear previous errors when starting new interaction
@@ -116,19 +116,41 @@ async def main():
 
             print("🚗 Agent: ", end="", flush=True)
 
-            # CRITICAL: Invoke the graph with the COMPLETE conversation_state
-            final_state = await app.ainvoke(conversation_state)
+            # CRITICAL FIX: The graph invocation returns the final state after END
+            # We need to properly extract and merge the state updates
+            try:
+                result = await app.ainvoke(conversation_state)
 
-            # The final response is the last message added by the agent
-            if final_state["messages"] and len(final_state["messages"]) > 0:
-                response_message = final_state["messages"][-1]
-                print(f"{response_message.content}")
-            else:
-                print("I'm processing your request...")
+                # CRITICAL: The result IS the final state after all nodes have executed
+                # We need to use this as our new conversation state
+                if result:
+                    # Update conversation_state with all the changes from the graph execution
+                    conversation_state.update(result)
 
-            # CRITICAL: Update our local state with the final state from the graph.
-            # This ensures the agent remembers the conversation for the next turn.
-            conversation_state = final_state
+                    # The final response is the last message added by the agent
+                    if result.get("messages") and len(result["messages"]) > 0:
+                        # Find the last AI message
+                        last_ai_message = None
+                        for msg in reversed(result["messages"]):
+                            if hasattr(msg, 'type') and msg.type == 'ai':
+                                last_ai_message = msg
+                                break
+
+                        if last_ai_message:
+                            print(f"{last_ai_message.content}")
+                        else:
+                            print("I'm processing your request...")
+                    else:
+                        print("I'm processing your request...")
+                else:
+                    print("I encountered an issue processing your request.")
+
+            except Exception as graph_error:
+                logger.error(f"Graph execution error: {graph_error}", exc_info=True)
+                print("I'm sorry, I encountered a technical issue. Let me try to help you again.")
+                conversation_state["last_error"] = None
+                conversation_state["failed_node"] = None
+                continue
 
             # Debug info (can be removed in production)
             if conversation_state.get("search_city"):
@@ -137,11 +159,18 @@ async def main():
                 filter_status = " (filtered)" if conversation_state.get("is_filtered", False) else ""
                 print(f"\n[Debug: {drivers_count}/{all_drivers_count} drivers available in {conversation_state['search_city']}{filter_status}]")
 
+            # Additional debug info for state tracking
+            logger.debug(f"Post-execution state - Search city: {conversation_state.get('search_city')}")
+            logger.debug(f"Current drivers: {len(conversation_state.get('current_drivers', []))}")
+            logger.debug(f"All drivers: {len(conversation_state.get('all_drivers', []))}")
+            logger.debug(f"Active filters: {conversation_state.get('active_filters', {})}")
+            logger.debug(f"Is filtered: {conversation_state.get('is_filtered', False)}")
+
         except KeyboardInterrupt:
             print("\n\n🚗 Agent: Goodbye! Hope to help you again soon!")
             break
         except Exception as e:
-            logger.critical(f"An unhandled error occurred in the graph execution: {e}", exc_info=True)
+            logger.critical(f"An unhandled error occurred in the main loop: {e}", exc_info=True)
             print("\n🚗 Agent: I'm sorry, I encountered a technical issue. Let me try to help you again.")
             # Reset error state but keep the conversation context
             conversation_state["last_error"] = None

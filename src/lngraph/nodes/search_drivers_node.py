@@ -1,10 +1,11 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from src.models.agent_state_model import AgentState
 import logging
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from src.lngraph.tools.driver_tools import DriverTools
+from src.models.drivers_model import DriverModel
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +85,11 @@ class SearchDriversNode:
             tool_response = await self.driver_tools.search_drivers_tool.ainvoke({
                 "city": city,
                 "page": state["current_page"],
-                "limit": state["page_size"],
+                "limit": state["limit"],
             })
 
             if tool_response.get("success"):
-                drivers = tool_response.get("drivers", [])
+                drivers: List[DriverModel] = tool_response.get("drivers", [])
                 driver_count = len(drivers)
 
                 logger.info(f"Successfully found {driver_count} drivers.")
@@ -96,15 +97,15 @@ class SearchDriversNode:
                 # CRITICAL: Store both current and all drivers
                 return {
                     "search_city": city,
-                    "current_drivers": drivers,  # Currently displayed drivers
-                    "all_drivers": drivers,      # ALL drivers (preserved for filtering)
+                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],  # Currently displayed drivers
+                    "all_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],      # ALL drivers (preserved for filtering)
                     "total_results": tool_response.get("total", 0),
                     "has_more_results": tool_response.get("has_more", False),
-                    "last_error": None,  # Clear previous errors on success
-                    "is_filtered": False,  # Reset filter status on new search
-                    "active_filters": {},  # Clear filters on new search
-                    "selected_driver": None,  # Clear selected driver on new search
-                    "driver_summary": None,  # Clear driver summary on new search
+                    "last_error": None,
+                    "is_filtered": False,
+                    "active_filters": {},
+                    "selected_driver": None,
+                    "driver_summary": None,
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while searching.')
@@ -112,8 +113,8 @@ class SearchDriversNode:
                 return {
                     "last_error": tool_response.get("msg", error_msg),
                     "failed_node": "search_drivers_node",
-                    "current_drivers": [],  # Clear drivers on failure
-                    "all_drivers": [],     # Clear all drivers on failure
+                    "current_drivers": [],
+                    "all_drivers": [],
                 }
         except Exception as e:
             logger.critical(f"A critical error occurred in SearchDriversNode: {e}", exc_info=True)

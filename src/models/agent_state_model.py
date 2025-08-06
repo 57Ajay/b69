@@ -1,8 +1,10 @@
 from typing import Optional, Any, List, Dict, TypedDict
 from langchain_core.messages import BaseMessage
-from src.models.drivers_model import DriverModel
 from src.models.user_model import UserModel
 
+class DriverDetailsForState(TypedDict):
+    driver_id: str
+    driver_name: str
 
 class AgentState(TypedDict):
     """
@@ -23,7 +25,7 @@ class AgentState(TypedDict):
     # --- Search Context & Parameters ---
     search_city: Optional[str]
     current_page: int
-    page_size: int
+    limit: int
     radius: int
     search_strategy: str
     use_cache: bool
@@ -31,16 +33,16 @@ class AgentState(TypedDict):
     # --- Filtering ---
     active_filters: Dict[str, Any]
     previous_filters: List[Dict[str, Any]]
-    is_filtered: bool  # NEW: Track if we're showing filtered results
-    total_filtered_results: int  # NEW: Count of filtered results
+    is_filtered: bool
+    total_filtered_results: int
 
     # --- API Results & Driver Context ---
-    current_drivers: List[DriverModel]  # Currently displayed drivers (may be filtered)
-    all_drivers: List[DriverModel]  # NEW: All drivers from original search (preserved)
+    current_drivers: Optional[List[DriverDetailsForState]]
+    all_drivers: Optional[List[DriverDetailsForState]]
     total_results: int
     has_more_results: bool
-    selected_driver: Optional[DriverModel]
-    driver_summary: Optional[Dict[str, Any]]  # Detailed driver info
+    selected_driver: Optional[DriverDetailsForState]
+    driver_summary: Optional[Dict[str, Any]]
 
     # --- Booking Flow ---
     booking_status: str  # e.g., "none", "confirmed", "failed".
@@ -52,7 +54,7 @@ class AgentState(TypedDict):
     trip_type: str
     trip_duration: Optional[int]
     full_trip_details: bool
-    trip_doc_id: str
+    trip_doc_id: Optional[str]
 
     # --- Error Handling & Flow Control ---
     last_error: Optional[str]

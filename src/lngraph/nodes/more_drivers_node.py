@@ -52,7 +52,7 @@ class MoreDriversNode:
             tool_response = await self.driver_tools.search_drivers_tool.ainvoke({
                 "city": state["search_city"],
                 "page": next_page,
-                "limit": state["page_size"],
+                "limit": state["limit"],
                 **state.get("active_filters", {})
             })
 
