@@ -15,25 +15,24 @@ from src.lngraph.tools.driver_tools import DriverTools
 
 def route_after_intent_classification(state: AgentState):
     """
-    CRITICAL: Enhanced router with strict state validation and proper flow control.
+    FIXED: Enhanced router with better validation and trip info prioritization.
     """
     intent = state.get("intent")
     search_city = state.get("search_city")
     current_drivers = state.get("current_drivers", [])
     all_drivers = state.get("all_drivers", [])
 
-    current_drivers_lenght = len(current_drivers) if current_drivers else 0
+    current_drivers_length = len(current_drivers) if current_drivers else 0
 
-    print(f"DEBUG: Routing intent '{intent}' with search_city: {search_city}, drivers: {current_drivers_lenght}")
+    print(f"DEBUG: Routing intent '{intent}' with search_city: {search_city}, drivers: {current_drivers_length}")
 
-    has_complete_trip_info = (
-        state.get("pickupLocation") and
-        state.get("dropLocation")
-    )
+    # FIXED: Better trip info validation
+    has_complete_trip_info = state.get("full_trip_details", False)
 
     if intent == "general_intent":
         return "generate_response"
 
+    # FIXED: Always check trip info first for booking and search intents
     if intent == "booking_or_confirmation_intent":
         if not has_complete_trip_info:
             return "collect_trip_info"
@@ -46,17 +45,24 @@ def route_after_intent_classification(state: AgentState):
             return "collect_trip_info"
         return "search_drivers"
 
+    # For info and filter intents, we need drivers to be available
     if intent == "driver_info_intent":
         if not search_city or (not current_drivers and not all_drivers):
             return "generate_response"
         return "get_driver_info"
 
     if intent == "filter_intent":
-        if not search_city or (not current_drivers and not all_drivers):
-            return "generate_response"
+        if not search_city:
+            # If no search city, we need trip info first
+            if not has_complete_trip_info:
+                return "collect_trip_info"
+            else:
+                return "search_drivers"
         return "filter_drivers"
 
     if intent == "more_drivers_intent":
+        if not search_city or (not current_drivers and not all_drivers):
+            return "generate_response"
         return "more_drivers"
 
     return "generate_response"

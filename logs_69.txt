@@ -1,0 +1,257 @@
+
+ajay57 in ~/Projects/py/b69 on main λ uv run main.py
+2025-08-07 11:22:50,685 - INFO - Initializing services...
+2025-08-07 11:22:53,228 - INFO - Building the agent graph...
+
+🚗 Cab Booking Agent is ready! Type 'exit' to end the conversation.
+============================================================
+💬 You can ask me to:
+  • Find drivers: 'book me a cab from delhi to jaipur'
+  • Get driver info: 'tell me about ramesh' or 'ramesh phone number'
+  • Apply filters: 'show me SUV drivers' or 'drivers with 5+ years experience'
+  • Book a ride: 'book with ramesh'
+------------------------------------------------------------
+
+👤 You: can you show me drivers from delhi
+🚗 Agent: 2025-08-07 11:43:05,841 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:43:05,842 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:43:09,082 - INFO - Classified intent as: driver_search_intent
+state city: None
+DEBUG: Routing intent 'driver_search_intent' with search_city: None, drivers: 0
+2025-08-07 11:43:09,083 - INFO - Executing TripInfoCollectionNode...
+2025-08-07 11:43:10,208 - INFO - Missing trip information: ['destination']
+DEBUG: Trip info incomplete, generating response to ask for missing info
+2025-08-07 11:43:10,209 - INFO - Executing ResponseGeneratorNode...
+I need to know your destination. Could you please provide it?
+
+👤 You: jaipur
+🚗 Agent: 2025-08-07 11:43:18,307 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:43:18,308 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:43:19,865 - INFO - Classified intent as: driver_search_intent
+state city: None
+DEBUG: Routing intent 'driver_search_intent' with search_city: None, drivers: 0
+2025-08-07 11:43:19,866 - INFO - Executing TripInfoCollectionNode...
+2025-08-07 11:43:21,162 - INFO - Missing trip information: ['destination']
+DEBUG: Trip info incomplete, generating response to ask for missing info
+2025-08-07 11:43:21,163 - INFO - Executing ResponseGeneratorNode...
+I need to know your destination. Could you please provide it?
+
+👤 You: delhi to jaipur
+🚗 Agent: 2025-08-07 11:43:26,614 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:43:26,614 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:43:27,723 - INFO - Classified intent as: driver_search_intent
+state city: None
+DEBUG: Routing intent 'driver_search_intent' with search_city: None, drivers: 0
+2025-08-07 11:43:27,724 - INFO - Executing TripInfoCollectionNode...
+2025-08-07 11:43:29,253 - INFO - Complete trip information collected
+DEBUG: Trip info complete, proceeding to search drivers
+2025-08-07 11:43:29,254 - INFO - Executing SearchDriversNode...
+2025-08-07 11:43:29,254 - INFO - Performing driver search in city: delhi
+2025-08-07 11:43:29,256 - INFO - Fetching premium drivers from: https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers with params: {'city': 'delhi', 'page': 1, 'limit': 5, 'radius': 100, 'searchStrategy': 'hybrid', 'sortBy': 'lastAccess:desc'}
+2025-08-07 11:43:31,513 - INFO - HTTP Request: GET https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers?city=delhi&page=1&limit=5&radius=100&searchStrategy=hybrid&sortBy=lastAccess%3Adesc "HTTP/1.1 200 OK"
+2025-08-07 11:43:31,761 - INFO - Cached data for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_1
+2025-08-07 11:43:31,761 - INFO - Successfully found 5 drivers.
+2025-08-07 11:43:31,761 - INFO - Executing ResponseGeneratorNode...
+2025-08-07 11:43:31,769 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_1 ( X 5 times )
+2025-08-07 11:43:31,770 - INFO - Generated AI Response: I found 5 drivers in delhi:
+
+1. Ajay 0 yrs exp, hatchback, ₹10/km
+2. Chand Singh 0 yrs exp, suv, ₹15/km
+3. Narendra Dabarai 0 yrs exp, hatchback, ₹10/km
+4. Vikrant 0 yrs exp, hatchback, ₹10/km
+5. Suraj 0 yrs exp, sedan, ₹10/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi:
+
+1. Ajay 0 yrs exp, hatchback, ₹10/km
+2. Chand Singh 0 yrs exp, suv, ₹15/km
+3. Narendra Dabarai 0 yrs exp, hatchback, ₹10/km
+4. Vikrant 0 yrs exp, hatchback, ₹10/km
+5. Suraj 0 yrs exp, sedan, ₹10/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/5 drivers available in delhi]
+
+👤 You: can you filter by sedan and married drivers
+🚗 Agent: 2025-08-07 11:44:08,415 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:44:08,416 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:44:09,495 - INFO - Classified intent as: filter_intent
+state city: delhi
+DEBUG: Routing intent 'filter_intent' with search_city: delhi, drivers: 5
+2025-08-07 11:44:09,496 - INFO - Executing FilterDriversNode...
+2025-08-07 11:44:11,135 - INFO - Merging filters. Previous: {}, New: {'vehicle_types': ['sedan'], 'married': True}, Combined: {'vehicle_types': ['sedan'], 'married': True}
+2025-08-07 11:44:11,137 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_1
+2025-08-07 11:44:11,139 - INFO - Successfully filtered drivers. Found 5 matches.
+2025-08-07 11:44:11,140 - INFO - Executing ResponseGeneratorNode...
+2025-08-07 11:44:11,141 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_1 ( 5 times )
+2025-08-07 11:44:11,154 - INFO - Generated AI Response: I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True):
+
+1. Ajay 0 yrs exp, hatchback, ₹10/km
+2. Chand Singh 0 yrs exp, suv, ₹15/km
+3. Narendra Dabarai 0 yrs exp, hatchback, ₹10/km
+4. Vikrant 0 yrs exp, hatchback, ₹10/km
+5. Suraj 0 yrs exp, sedan, ₹10/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True):
+
+1. Ajay 0 yrs exp, hatchback, ₹10/km
+2. Chand Singh 0 yrs exp, suv, ₹15/km
+3. Narendra Dabarai 0 yrs exp, hatchback, ₹10/km
+4. Vikrant 0 yrs exp, hatchback, ₹10/km
+5. Suraj 0 yrs exp, sedan, ₹10/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: show more
+🚗 Agent: 2025-08-07 11:44:24,721 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:44:24,721 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:44:26,309 - INFO - Classified intent as: more_drivers_intent
+state city: delhi
+DEBUG: Routing intent 'more_drivers_intent' with search_city: delhi, drivers: 5
+2025-08-07 11:44:26,310 - INFO - Executing MoreDriversNode...
+2025-08-07 11:44:26,310 - INFO - Fetching page 2 for drivers in delhi
+2025-08-07 11:44:26,312 - INFO - Fetching premium drivers from: https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers with params: {'city': 'delhi', 'page': 2, 'limit': 5, 'radius': 100, 'searchStrategy': 'hybrid', 'sortBy': 'lastAccess:desc', 'vehicleTypes': 'sedan', 'married': True}
+2025-08-07 11:44:28,337 - INFO - HTTP Request: GET https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers?city=delhi&page=2&limit=5&radius=100&searchStrategy=hybrid&sortBy=lastAccess%3Adesc&vehicleTypes=sedan&married=true "HTTP/1.1 200 OK"
+2025-08-07 11:44:28,617 - INFO - Cached data for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_2
+2025-08-07 11:44:28,618 - INFO - Executing ResponseGeneratorNode...
+2025-08-07 11:44:28,624 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_2
+2025-08-07 11:44:28,626 - INFO - Generated AI Response: I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True):
+
+1. Naveen Kumar 0 yrs exp, sedan, ₹10/km
+2. Jagtar Singh 0 yrs exp, sedan, ₹12/km
+3. Arun 0 yrs exp, sedan, ₹12/km
+4. Jasvir Singh 15 yrs exp, sedan, suv, ₹14/km
+5. Anil Kumar Shakya 0 yrs exp, sedan, ₹12/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True):
+
+1. Naveen Kumar 0 yrs exp, sedan, ₹10/km
+2. Jagtar Singh 0 yrs exp, sedan, ₹12/km
+3. Arun 0 yrs exp, sedan, ₹12/km
+4. Jasvir Singh 15 yrs exp, sedan, suv, ₹14/km
+5. Anil Kumar Shakya 0 yrs exp, sedan, ₹12/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/10 drivers available in delhi (filtered)]
+
+👤 You: filter by minimum age 40
+🚗 Agent: 2025-08-07 11:47:24,773 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:47:24,774 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:47:27,128 - INFO - Classified intent as: filter_intent
+state city: delhi
+DEBUG: Routing intent 'filter_intent' with search_city: delhi, drivers: 5
+2025-08-07 11:47:27,128 - INFO - Executing FilterDriversNode...
+2025-08-07 11:47:28,371 - INFO - Merging filters. Previous: {'vehicle_types': ['sedan'], 'married': True}, New: {'min_age': 40}, Combined: {'vehicle_types': ['sedan'], 'married': True, 'min_age': 40}
+2025-08-07 11:47:28,373 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_1
+2025-08-07 11:47:28,374 - INFO - Successfully filtered drivers. Found 5 matches.
+2025-08-07 11:47:28,375 - INFO - Executing ResponseGeneratorNode...
+2025-08-07 11:47:28,376 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_1
+2025-08-07 11:47:28,383 - INFO - Generated AI Response: I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True, min age: 40):
+
+1. Ajay 0 yrs exp, hatchback, ₹10/km
+2. Chand Singh 0 yrs exp, suv, ₹15/km
+3. Narendra Dabarai 0 yrs exp, hatchback, ₹10/km
+4. Vikrant 0 yrs exp, hatchback, ₹10/km
+5. Suraj 0 yrs exp, sedan, ₹10/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True, min age: 40):
+
+1. Ajay 0 yrs exp, hatchback, ₹10/km
+2. Chand Singh 0 yrs exp, suv, ₹15/km
+3. Narendra Dabarai 0 yrs exp, hatchback, ₹10/km
+4. Vikrant 0 yrs exp, hatchback, ₹10/km
+5. Suraj 0 yrs exp, sedan, ₹10/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: tell me about naveen kumar
+🚗 Agent: 2025-08-07 11:47:58,118 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:47:58,118 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:47:59,797 - INFO - Classified intent as: driver_info_intent
+state city: delhi
+DEBUG: Routing intent 'driver_info_intent' with search_city: delhi, drivers: 5
+2025-08-07 11:47:59,798 - INFO - Executing GetDriverInfoNode...
+2025-08-07 11:48:01,225 - INFO - Executing ResponseGeneratorNode...
+I couldn't find that specific driver. Available drivers include: Ajay, Chand Singh, Narendra Dabarai, Vikrant, Suraj. Please try again.
+
+[Debug: 5/5 drivers available in delhi (filtered)]
+
+👤 You: show more
+🚗 Agent: 2025-08-07 11:48:13,847 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:48:13,848 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:48:15,256 - INFO - Classified intent as: more_drivers_intent
+state city: delhi
+DEBUG: Routing intent 'more_drivers_intent' with search_city: delhi, drivers: 5
+2025-08-07 11:48:15,257 - INFO - Executing MoreDriversNode...
+2025-08-07 11:48:15,257 - INFO - Fetching page 2 for drivers in delhi
+2025-08-07 11:48:15,259 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_2
+2025-08-07 11:48:15,260 - INFO - Executing ResponseGeneratorNode...
+2025-08-07 11:48:15,262 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_2 ( 5 times )
+2025-08-07 11:48:15,273 - INFO - Generated AI Response: I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True, min age: 40):
+
+1. Naveen Kumar 0 yrs exp, sedan, ₹10/km
+2. Jagtar Singh 0 yrs exp, sedan, ₹12/km
+3. Arun 0 yrs exp, sedan, ₹12/km
+4. Jasvir Singh 15 yrs exp, sedan, suv, ₹14/km
+5. Anil Kumar Shakya 0 yrs exp, sedan, ₹12/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True, min age: 40):
+
+1. Naveen Kumar 0 yrs exp, sedan, ₹10/km
+2. Jagtar Singh 0 yrs exp, sedan, ₹12/km
+3. Arun 0 yrs exp, sedan, ₹12/km
+4. Jasvir Singh 15 yrs exp, sedan, suv, ₹14/km
+5. Anil Kumar Shakya 0 yrs exp, sedan, ₹12/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/10 drivers available in delhi (filtered)]
+
+👤 You: show more
+🚗 Agent: 2025-08-07 11:48:30,260 - INFO - Executing InitializeAgentNode...
+2025-08-07 11:48:30,260 - INFO - Executing ClassifyIntentNode...
+2025-08-07 11:48:31,579 - INFO - Classified intent as: more_drivers_intent
+state city: delhi
+DEBUG: Routing intent 'more_drivers_intent' with search_city: delhi, drivers: 5
+2025-08-07 11:48:31,580 - INFO - Executing MoreDriversNode...
+2025-08-07 11:48:31,580 - INFO - Fetching page 3 for drivers in delhi
+2025-08-07 11:48:31,582 - INFO - Fetching premium drivers from: https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers with params: {'city': 'delhi', 'page': 3, 'limit': 5, 'radius': 100, 'searchStrategy': 'hybrid', 'sortBy': 'lastAccess:desc', 'vehicleTypes': 'sedan', 'minAge': 40, 'married': True}
+2025-08-07 11:48:33,692 - INFO - HTTP Request: GET https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botApiGetPremiumDrivers?city=delhi&page=3&limit=5&radius=100&searchStrategy=hybrid&sortBy=lastAccess%3Adesc&vehicleTypes=sedan&minAge=40&married=true "HTTP/1.1 200 OK"
+2025-08-07 11:48:34,073 - INFO - Cached data for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_3
+2025-08-07 11:48:34,073 - INFO - Executing ResponseGeneratorNode...
+2025-08-07 11:48:34,080 - INFO - Cache hit for key: f8921433-e3e0-4aca-bcc3-b0d1225c87f5_delhi_3 ( printed 5 times removed for less clutter )
+2025-08-07 11:48:34,080 - INFO - Generated AI Response: I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True, min age: 40):
+
+1. Mohd. Aslam 0 yrs exp, sedan, ₹12/km
+2. Pawan Kumar 15 yrs exp, sedan, ₹12/km
+3. Irfan Ahmad 0 yrs exp, sedan, ₹10/km
+4. Kuljit Singh 20 yrs exp, sedan, ₹20/km
+5. Shiv Kumar 0 yrs exp, sedan, ₹12/km
+
+Say 'show more' to see more drivers.
+I found 5 drivers in delhi (filtered by: vehicle types: ['sedan'], married: True, min age: 40):
+
+1. Mohd. Aslam 0 yrs exp, sedan, ₹12/km
+2. Pawan Kumar 15 yrs exp, sedan, ₹12/km
+3. Irfan Ahmad 0 yrs exp, sedan, ₹10/km
+4. Kuljit Singh 20 yrs exp, sedan, ₹20/km
+5. Shiv Kumar 0 yrs exp, sedan, ₹12/km
+
+Say 'show more' to see more drivers.
+
+[Debug: 5/15 drivers available in delhi (filtered)]
+
+👤 You: exit
+🚗 Agent: Thank you for using our cab booking service! Have a great day!
+
