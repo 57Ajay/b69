@@ -107,6 +107,7 @@ class GetDriverInfoNode:
                 "driver_names": ", ".join(driver_names),
                 "user_message": user_message
             })
+            # print("\nRAW: \n", raw, "\n\n")
             identifier = DriverIdentifier.model_validate(raw)
         except Exception as e:
             logger.error(f"Error during driver identification: {e}", exc_info=True)

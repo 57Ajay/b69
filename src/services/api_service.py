@@ -174,6 +174,7 @@ class DriversAPIClient:
             custom_filters=custom_filters,
         )
         params.update(filters)
+        # print("\n\nPARAMS:\n\n", params)
         logger.debug(f"Filters applied: {filters}")
 
         # Check cache first if enabled

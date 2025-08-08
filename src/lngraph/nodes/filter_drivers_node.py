@@ -46,42 +46,6 @@ class FilterDriversNode:
         self.llm = llm
         self.driver_tools = driver_tools
 
-    def _normalize_filter_values(self, filter_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        FIXED: Normalize filter values to match API expectations.
-        """
-        normalized = {}
-
-        for key, value in filter_dict.items():
-            if key == "vehicle_types" and isinstance(value, list):
-                # Convert list to comma-separated string for API
-                normalized["vehicleTypes"] = ",".join(value)
-            elif key == "languages" and isinstance(value, list):
-                normalized["verifiedLanguages"] = ",".join(value)
-            elif key == "is_pet_allowed" and isinstance(value, bool):
-                normalized["isPetAllowed"] = str(value).lower()
-            elif key == "min_experience":
-                normalized["minExperience"] = value
-            elif key == "min_age":
-                normalized["minAge"] = value
-            elif key == "gender":
-                normalized["gender"] = value
-            elif key == "married" and isinstance(value, bool):
-                normalized["married"] = value
-            elif key == "allow_handicapped_persons":
-                normalized["allowHandicappedPersons"] = value
-            elif key == "available_for_customers_personal_car":
-                normalized["availableForCustomersPersonalCar"] = value
-            elif key == "available_for_driving_in_event_wedding":
-                normalized["availableForDrivingInEventWedding"] = value
-            elif key == "available_for_part_time_full_time":
-                normalized["availableForPartTimeFullTime"] = value
-            else:
-                # Keep other filters as-is
-                normalized[key] = value
-
-        return normalized
-
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
         FIXED: Executes the logic to extract filters and apply them via fresh API call.
@@ -122,7 +86,9 @@ class FilterDriversNode:
 
             Examples:
             - "show me sedan drivers" -> vehicle_types: ["sedan"]
+            - "show me sedan and suv drivers" -> vehicle_types: ["sedan", "suv"]
             - "married drivers only" -> married: true
+            - "drivers who are married and speak hindi and also have a sedan" -> languages: ["hindi"], vehicle_types: ["sedan"], married: true
             - "drivers who speak hindi" -> languages: ["hindi"]
             - "minimum 5 years experience" -> min_experience: 5
             - "clear filters and show SUV drivers" -> clear_previous_filters: true, vehicle_types: ["suv"]
@@ -135,12 +101,21 @@ class FilterDriversNode:
         try:
             raw = await extract_chain.ainvoke({"user_message": user_message})
             extracted_filters = FilterEntities.model_validate(raw)
+            # Use .model_dump() with exclude_unset=True to only get explicitly set fields
             filter_dict = extracted_filters.model_dump(exclude_unset=True)
+
             clear_filters = filter_dict.pop("clear_previous_filters", False)
 
             if not filter_dict and not clear_filters:
                 logger.warning("Filter intent classified, but no specific filters were extracted.")
-                return {"last_error": "I understand you want to filter, but I'm not sure what criteria to use. Could you please be more specific? For example: 'show me sedan drivers' or 'married drivers only'"}
+                unsupported_filters_message = (
+                    "I can help with that, but I need to know what to filter by. "
+                    "You can filter by vehicle type (SUV, Sedan), driver experience, age, gender, "
+                    "languages spoken, marital status, or if they are pet-friendly. "
+                    "You can also apply multiple filters at once, like 'show me married SUV drivers'."
+                )
+                return {"last_error": unsupported_filters_message, "failed_node": "filter_drivers_node"}
+
 
         except Exception as e:
             logger.error(f"Error during filter extraction: {e}", exc_info=True)
@@ -157,22 +132,16 @@ class FilterDriversNode:
             updated_filters = {**current_filters, **filter_dict}
             logger.info(f"Merging filters. Previous: {current_filters}, New: {filter_dict}, Combined: {updated_filters}")
 
-        # 3. FIXED: Normalize filters for API call
-        normalized_filters = self._normalize_filter_values(updated_filters)
-        logger.info(f"Normalized filters for API: {normalized_filters}")
-
-        new_page = state["current_page"]+1
+        # Always start from page 1 for a new filter application
+        new_page = state["current_page"] + 1
         try:
             # Build API parameters
             api_params = {
                 "city": state["search_city"],
                 "page": new_page,
                 "limit": state["limit"],
-                "radius": state.get("radius", 100),
-                "search_strategy": state.get("search_strategy", "hybrid"),
-                "sort_by": "lastAccess:desc",
                 "use_cache": True,
-                **normalized_filters
+                **updated_filters
             }
 
             logger.info(f"Making API call with parameters: {api_params}")
@@ -183,54 +152,44 @@ class FilterDriversNode:
                 filtered_drivers: List[DriverModel] = tool_response.get("drivers", [])
                 logger.info(f"Successfully filtered drivers. Found {len(filtered_drivers)} matches.")
 
-                current_drivers = [{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers]
+                # If no drivers are found with the new filters
+                if not filtered_drivers:
+                    filter_summary_parts = []
+                    for key, value in updated_filters.items():
+                        filter_summary_parts.append(f"{key.replace('_', ' ')}: {value}")
+                    filter_summary = ", ".join(filter_summary_parts)
+                    return {
+                        "last_error": f"I couldn't find any drivers in {state['search_city']} matching your criteria: {filter_summary}. Would you like to try removing some filters?",
+                        "failed_node": "filter_drivers_node",
+                        "current_drivers": [],
+                        "all_drivers": [], # Reset drivers since the filtered search yielded none
+                        "active_filters": updated_filters,
+                        "is_filtered": True,
+                        "has_more_results": False,
+                        "total_results": 0,
+                    }
 
-                logger.info(f"Filtered drivers: {current_drivers}")
-                all_drivers = state["all_drivers"] if state["all_drivers"] else []
-                logger.info(f"Details of page and cirty: -> \npage: {state['current_page']}, city: {state['search_city']}")
 
+                driver_details_for_state = [{"driver_name": driver.name, "driver_id": driver.id} for driver in filtered_drivers]
+
+                # A new filter action should replace the existing list of drivers
                 return {
-                    "current_drivers": current_drivers,
-                    "all_drivers": all_drivers + current_drivers,
+                    "current_drivers": driver_details_for_state,
+                    "all_drivers": driver_details_for_state,
                     "active_filters": updated_filters,
-                    "last_error": None,
                     "is_filtered": True,
-                    "total_filtered_results": len(filtered_drivers),
+                    "total_filtered_results": tool_response.get("total", 0),
+                    "current_page": new_page,
+                    "has_more_results": tool_response.get("has_more", False),
+                    "total_results": tool_response.get("total", 0),
+                    "last_error": None,
                     "failed_node": None,
                     "selected_driver": None,
                     "driver_summary": None,
-                    "current_page": new_page,
-                    "has_more_results": tool_response.get("has_more", False),
-                    "total_results": tool_response.get("total", 0)
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while filtering.')
                 logger.error(f"Filter tool failed: {error_msg}")
-
-                # If no results found, provide helpful message
-                if "No drivers found" in str(error_msg) or tool_response.get("count", 0) == 0:
-                    filter_summary = []
-                    for key, value in updated_filters.items():
-                        if key == "vehicle_types":
-                            filter_summary.append(f"vehicle type: {', '.join(value) if isinstance(value, list) else value}")
-                        elif key == "married":
-                            filter_summary.append("married drivers" if value else "unmarried drivers")
-                        elif key == "min_age":
-                            filter_summary.append(f"minimum age {value}")
-                        elif key == "min_experience":
-                            filter_summary.append(f"minimum {value} years experience")
-                        else:
-                            filter_summary.append(f"{key.replace('_', ' ')}: {value}")
-
-                    return {
-                        "last_error": f"No drivers found in {state['search_city']} matching your criteria: {', '.join(filter_summary)}. Would you like to remove some filters or try different criteria?",
-                        "failed_node": "filter_drivers_node",
-                        "current_drivers": [],
-                        "all_drivers": [],
-                        "active_filters": updated_filters,
-                        "is_filtered": True
-                    }
-
                 return {"last_error": tool_response.get("msg", error_msg), "failed_node": "filter_drivers_node"}
 
         except Exception as e:

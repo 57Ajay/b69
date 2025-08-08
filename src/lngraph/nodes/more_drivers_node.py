@@ -24,10 +24,14 @@ class MoreDriversNode:
     def _normalize_filters_for_api(self, active_filters: Dict[str, Any]) -> Dict[str, Any]:
         """
         FIXED: Convert user-friendly filters to API format.
+        This now handles all supported filters correctly and is consistent
+        with the FilterDriversNode.
         """
         normalized = {}
 
         for key, value in active_filters.items():
+            if value is None:
+                continue
             if key == "vehicle_types" and isinstance(value, list):
                 normalized["vehicleTypes"] = ",".join(value)
             elif key == "languages" and isinstance(value, list):
@@ -51,10 +55,10 @@ class MoreDriversNode:
             elif key == "available_for_part_time_full_time":
                 normalized["availableForPartTimeFullTime"] = value
             else:
-                # Keep other filters as-is
                 normalized[key] = value
 
         return normalized
+
 
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
@@ -74,37 +78,30 @@ class MoreDriversNode:
                 "failed_node": "more_drivers_node"
             }
 
-        # Check if there are more results available
         if not state.get("has_more_results", False):
+            # This is not an error, but a final state. The response generator will handle the message.
             return {
-                "last_error": "I've already shown you all the available drivers for your search criteria.",
-                "failed_node": "more_drivers_node"
+                "messages": ["I've already shown you all the available drivers for your search criteria."],
             }
 
-        # Increment the page number
+
         current_page = state.get("current_page", 1)
         next_page = current_page + 1
 
-        # FIXED: Get active filters and normalize them for API
         active_filters = state.get("active_filters", {})
         normalized_filters = self._normalize_filters_for_api(active_filters)
 
         logger.info(f"Fetching page {next_page} for drivers in {state['search_city']} with filters: {active_filters}")
 
-        # FIXED: Build API parameters with all necessary filters
         api_params = {
             "city": state["search_city"],
             "page": next_page,
             "limit": state["limit"],
-            "radius": state.get("radius", 100),
-            "search_strategy": state.get("search_strategy", "hybrid"),
-            "sort_by": "lastAccess:desc",
             **normalized_filters
         }
 
         logger.info(f"API call parameters: {api_params}")
 
-        # Call the search tool with the next page number and active filters
         try:
             tool_response = await self.driver_tools.search_drivers_tool.ainvoke(api_params)
 
@@ -112,12 +109,12 @@ class MoreDriversNode:
                 new_drivers: List[DriverModel] = tool_response.get("drivers", [])
 
                 if not new_drivers:
+                    # This can happen if the last page was full but there are no more results
                     return {
-                        "last_error": "No more drivers found matching your criteria.",
-                        "failed_node": "more_drivers_node"
+                        "has_more_results": False,
+                        "messages": ["No more drivers found matching your criteria."],
                     }
 
-                # FIXED: Properly combine with existing drivers
                 existing_all_drivers = state.get("all_drivers", [])
                 if existing_all_drivers is None:
                     existing_all_drivers = []
@@ -129,26 +126,15 @@ class MoreDriversNode:
 
                 return {
                     "current_page": next_page,
-                    "current_drivers": new_driver_entries,
-                    "all_drivers": updated_all_drivers,
-                    "total_results": tool_response.get("total", 0),
+                    "current_drivers": new_driver_entries, # Show only the new drivers to the user
+                    "all_drivers": updated_all_drivers,    # Keep track of all drivers seen
                     "has_more_results": tool_response.get("has_more", False),
                     "last_error": None,
                     "failed_node": None,
-                    "active_filters": active_filters,
-                    "is_filtered": state.get("is_filtered", False),
                 }
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred.')
                 logger.error(f"More drivers API call failed: {error_msg}")
-
-                # Provide helpful error message
-                if "No drivers found" in str(error_msg):
-                    return {
-                        "last_error": "No more drivers found matching your current filters. This might be the end of available drivers.",
-                        "failed_node": "more_drivers_node"
-                    }
-
                 return {
                     "last_error": f"Failed to fetch more drivers: {error_msg}",
                     "failed_node": "more_drivers_node",
