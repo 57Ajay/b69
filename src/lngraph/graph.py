@@ -12,60 +12,54 @@ from src.lngraph.nodes.trip_info_collection_node import TripInfoCollectionNode
 from src.lngraph.nodes.more_drivers_node import MoreDriversNode
 from langchain_google_vertexai import ChatVertexAI
 from src.lngraph.tools.driver_tools import DriverTools
+import logging
 
+logger = logging.getLogger(__name__)
 def route_after_intent_classification(state: AgentState):
     """
     FIXED: Enhanced router with better validation and trip info prioritization.
+    This router now acts as a strict gatekeeper, ensuring trip details are
+    collected before allowing any search, booking, or filtering operations.
     """
     intent = state.get("intent")
-    search_city = state.get("search_city")
-    current_drivers = state.get("current_drivers", [])
+    has_complete_trip_info = state.get("full_trip_details", False)
     all_drivers = state.get("all_drivers", [])
 
-    current_drivers_length = len(current_drivers) if current_drivers else 0
+    print(f"DEBUG: Routing intent '{intent}' with has_complete_trip_info: {has_complete_trip_info}")
 
-    print(f"DEBUG: Routing intent '{intent}' with search_city: {search_city}, drivers: {current_drivers_length}")
+    # --- Primary Gatekeeper ---
+    # For any intent that requires driver context, first ensure we have trip details.
+    if intent in ["driver_search_intent", "booking_or_confirmation_intent", "filter_intent", "more_drivers_intent"]:
+        if not has_complete_trip_info:
+            return "collect_trip_info"
 
-    # FIXED: Better trip info validation
-    has_complete_trip_info = state.get("full_trip_details", False)
-
+    # --- Intent-Based Routing (Post-Gatekeeper) ---
     if intent == "general_intent":
         return "generate_response"
 
-    # FIXED: Always check trip info first for booking and search intents
-    if intent == "booking_or_confirmation_intent":
-        if not has_complete_trip_info:
-            return "collect_trip_info"
-        if not search_city or (not current_drivers and not all_drivers):
-            return "search_drivers"
-        return "book_driver"
-
     if intent == "driver_search_intent":
-        if not has_complete_trip_info:
-            return "collect_trip_info"
         return "search_drivers"
 
-    # For info and filter intents, we need drivers to be available
+    if intent == "booking_or_confirmation_intent":
+        if not all_drivers: # Can't book if no drivers have ever been searched for
+            return "generate_response"
+        return "book_driver"
+
     if intent == "driver_info_intent":
-        if not search_city or (not current_drivers and not all_drivers):
+        if not all_drivers: # Can't get info if no drivers are in context
             return "generate_response"
         return "get_driver_info"
 
     if intent == "filter_intent":
-        if not search_city:
-            # If no search city, we need trip info first
-            if not has_complete_trip_info:
-                return "collect_trip_info"
-            else:
-                return "search_drivers"
         return "filter_drivers"
 
     if intent == "more_drivers_intent":
-        if not search_city or (not current_drivers and not all_drivers):
+        if not all_drivers:
             return "generate_response"
         return "more_drivers"
 
     return "generate_response"
+
 
 def route_after_trip_collection(state: AgentState):
     """
@@ -83,8 +77,12 @@ def route_after_trip_collection(state: AgentState):
 def should_continue_conversation(state: AgentState):
     """
     Determines if the conversation should continue or end.
+    FIXED: This function now always ends the graph turn after a response is generated.
+    The main application loop is responsible for continuing the conversation.
     """
+    logger.info("Graph execution complete for this turn.")
     return "end_conversation"
+
 
 def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools, api_client: DriversAPIClient):
     """
@@ -138,12 +136,14 @@ def create_agent_graph(llm: ChatVertexAI, driver_tools: DriverTools, api_client:
         }
     )
 
+    # All action nodes lead to the response generator to inform the user
     workflow.add_edge("search_drivers", "generate_response")
     workflow.add_edge("get_driver_info", "generate_response")
     workflow.add_edge("filter_drivers", "generate_response")
     workflow.add_edge("book_driver", "generate_response")
     workflow.add_edge("more_drivers", "generate_response")
 
+    # The response generator is the final step before the graph finishes its run.
     workflow.add_conditional_edges(
         "generate_response",
         should_continue_conversation,

@@ -2,15 +2,18 @@ from typing import Dict, Any
 from src.models.agent_state_model import AgentState
 import logging
 from langchain_google_vertexai import ChatVertexAI
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage
 from src.services.api_service import DriversAPIClient
+
 logger = logging.getLogger(__name__)
 
 
 class ResponseGeneratorNode:
     """
     FIXED: Node to generate a final, user-facing response based on the agent's state.
-    Handles filtering, trip collection, and driver display properly.
+    This version uses a powerful LLM prompt to generate natural, context-aware responses
+    instead of relying on rigid, hardcoded logic.
     """
 
     def __init__(self, llm: ChatVertexAI, client: DriversAPIClient):
@@ -24,245 +27,135 @@ class ResponseGeneratorNode:
         self.llm = llm
         self.client = client
 
-    def _format_filter_summary(self, active_filters: Dict[str, Any]) -> str:
+    def _format_state_for_prompt(self, state: AgentState) -> str:
         """
-        FIXED: Create human-readable filter summary.
+        Creates a structured, human-readable string from the state for the LLM prompt.
         """
-        if not active_filters:
-            return ""
+        prompt_parts = []
 
-        filter_parts = []
-        for key, value in active_filters.items():
-            if key == "vehicle_types" and value:
-                if isinstance(value, list):
-                    filter_parts.append(f"vehicle types: {', '.join(value)}")
-                else:
-                    filter_parts.append(f"vehicle type: {value}")
-            elif key == "married":
-                filter_parts.append("married" if value else "unmarried")
-            elif key == "min_age":
-                filter_parts.append(f"min age: {value}")
-            elif key == "min_experience":
-                filter_parts.append(f"min experience: {value} years")
-            elif key == "gender":
-                filter_parts.append(f"gender: {value}")
-            elif key == "languages" and value:
-                if isinstance(value, list):
-                    filter_parts.append(f"languages: {', '.join(value)}")
-                else:
-                    filter_parts.append(f"language: {value}")
-            elif key == "is_pet_allowed":
-                filter_parts.append("pet-friendly" if value else "no pets")
-            else:
-                filter_parts.append(f"{key.replace('_', ' ')}: {value}")
+        # Conversation History
+        history = "\n".join([f"{msg.type}: {msg.content}" for msg in state.get("messages", [])[-10:]])
+        prompt_parts.append(f"### Conversation History (last 10 messages):\n{history}\n")
 
-        return f" (filtered by: {', '.join(filter_parts)})" if filter_parts else ""
+        # Last User Message
+        prompt_parts.append(f"### Last User Message:\n{state.get('last_user_message', 'N/A')}\n")
+
+        # Handle errors first
+        if state.get("last_error"):
+            prompt_parts.append(f"### Priority Task: Address this error!\nError: {state.get('last_error')}\n")
+            return "".join(prompt_parts) # Stop here if there's an error
+
+        # Booking Status
+        if state.get("booking_status") == "confirmed" and state.get("booking_details"):
+            details = state.get("booking_details", {})
+            if details is None:
+                prompt_parts.append("### Priority Task: Fetch Booking Details!\nBooking details are not available.\n")
+                return "".join(prompt_parts)
+            prompt_parts.append(f"### Priority Task: Confirm Booking!\nBooking is confirmed for: {details.get('Driver Name')}\nContact: {details.get('PhoneNo.')}\nProfile: {details.get('Profile')}\n")
+
+        # Specific Driver Info
+        elif state.get("driver_summary"):
+            summary = state.get('driver_summary', {})
+            if summary is None:
+                prompt_parts.append("### Priority Task: Fetch Driver Info!\nDriver Summary is not available.\n")
+                return "".join(prompt_parts)
+
+            vehicles_str = ", ".join(summary.get("vehicles", ["Not available"]))
+            languages_str = ", ".join(summary.get("languages", ["Not specified"]))
+            costs_str = ", ".join([f"₹{c}" for c in summary.get("per_km_cost", [])])
+
+            summary_text = (
+                f"- Name: {summary.get('name', 'N/A')}\n"
+                f"- Age: {summary.get('age', 'N/A')}\n"
+                f"- Gender: {summary.get('gender', 'N/A')}\n"
+                f"- Experience: {summary.get('experience', 0)} years\n"
+                f"- Languages: {languages_str}\n"
+                f"- Pet-Friendly: {'Yes' if summary.get('pet_allowed') else 'No'}\n"
+                f"- Marital Status: {'Married' if summary.get('married') else 'Single'}\n"
+                f"- Vehicles & Cost: {vehicles_str} (Cost per KM: {costs_str})\n"
+                f"- Phone: {summary.get('phone', 'Not available')}\n"
+                f"- Profile URL: {summary.get('profile_url', 'Not available')}"
+            )
+            prompt_parts.append(f"### Task: Respond to query about a specific driver\nHere is the driver's data:\n{summary_text}\n")
+
+        # List of Drivers
+        elif state.get("current_drivers"):
+            drivers = state.get("current_drivers", [])
+            if drivers is None:
+                prompt_parts.append("### Priority Task: Fetch Driver Info!\nNO current Drivers are available.\n")
+                return "".join(prompt_parts)
+            filters = state.get("active_filters", {})
+
+            driver_list_str = "\n".join([f"{i+1}. {d['driver_name']} (ID: {d['driver_id']})" for i, d in enumerate(drivers)])
+
+            prompt_parts.append("### Task: Present a list of drivers\n")
+            prompt_parts.append(f"Found {len(drivers)} drivers in {state.get('search_city')}.\n")
+            if filters:
+                filter_str = ", ".join([f"{k.replace('_', ' ')}: {v}" for k,v in filters.items()])
+                prompt_parts.append(f"Active filters: {filter_str}\n")
+            prompt_parts.append(f"Driver List:\n{driver_list_str}\n")
+            if state.get("has_more_results"):
+                prompt_parts.append("There are more drivers available. Mention that the user can say 'show more'.\n")
+
+        # Initial State or need info
+        else:
+            prompt_parts.append("### Task: Guide the user to start a search.\n")
+            if not state.get("pickupLocation"):
+                prompt_parts.append("The user needs to provide a pickup location.\n")
+            elif not state.get("dropLocation"):
+                prompt_parts.append("The user needs to provide a drop-off location.\n")
+
+        return "".join(prompt_parts)
+
 
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
-        FIXED: Generates a response to the user based on the current state with proper filter handling.
-
-        Args:
-            state: The current state of the agent.
-
-        Returns:
-            A dictionary containing the new AI message to be added to the history.
+        FIXED: Generates a response to the user by feeding the current state to an LLM.
         """
         logger.info("Executing ResponseGeneratorNode...")
 
-        returnObj = {}
+        # Prepare a structured input for the LLM
+        state_summary = self._format_state_for_prompt(state)
 
-        # Get state variables
-        current_drivers = state.get("current_drivers", [])
-        search_city = state.get("search_city", "")
-        page = state.get("current_page", 1)
-        last_error = state.get("last_error")
-        selected_driver = state.get("selected_driver")
-        driver_summary = state.get("driver_summary")
-        booking_details = state.get("booking_details")
-        booking_status = state.get("booking_status")
-        active_filters = state.get("active_filters", {})
-        is_filtered = state.get("is_filtered", False)
-        has_more_results = state.get("has_more_results", False)
-        last_user_message = state.get("last_user_message", "").lower()
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a friendly and professional cab booking assistant.
+Your goal is to provide clear, natural, and helpful responses to the user based on the current state of the conversation.
+Analyze the provided state information and conversation history to craft the best possible response.
 
-        # Handle errors first
-        if last_error:
-            ai_message = AIMessage(content=last_error)
-            return {"messages": [ai_message]}
+**Response Guidelines:**
 
-        # Handle booking confirmation - HIGHEST PRIORITY
-        if booking_status == "confirmed" and booking_details:
-            driver_name = booking_details.get("Driver Name", "the driver")
-            phone = booking_details.get("PhoneNo.", "Contact information not available")
-            profile = booking_details.get("Profile", "")
+1.  **Prioritize Errors:** If there is a `Priority Task: Address this error!`, your primary goal is to communicate this error to the user in a helpful and clear way. Do not mention other information.
+2.  **Confirm Bookings:** If the `Priority Task` is to confirm a booking, create a cheerful confirmation message. Include the driver's name, contact number, and profile link. Wish them a safe trip.
+3.  **Answer Specific Questions:** If you have data for a specific driver (`Task: Respond to query about a specific driver`), analyze the 'Last User Message' to see if they asked for specific information (e.g., "what is his phone number?", "what car does he drive?").
+    - If they asked a specific question, answer ONLY that question.
+    - If the user asked a general question (e.g., "tell me more about him"), provide a concise, friendly summary of the driver's details. Do NOT just dump all the data.
+4.  **Present Driver Lists:** If the `Task` is to present a list of drivers, format it nicely. Mention the city and any active filters. At the end, guide the user on what to do next (e.g., "You can ask for more details about a driver, apply more filters, or ask to book one."). If more drivers are available, tell them they can say 'show more'.
+5.  **Guide the User:** If there are no drivers and no errors (`Task: Guide the user`), your job is to help the user start a search. If trip details like pickup or drop location are missing, ask for them.
+6.  **Be Natural:** Do not sound like a robot. Use conversational language. Avoid technical jargon.
+"""),
+            ("human", "Here is the current state of our conversation. Please generate the appropriate response for me to send to the user.\n\n{state_summary}")
+        ])
 
-            response_content = f"🎉 Great! Your booking with {driver_name} is confirmed!\n\n"
-            response_content += f"📞 Contact Number: {phone}\n"
-            response_content += f"👤 Profile: {profile}\n"
-            response_content += "\n✅ The driver will contact you soon for pickup details. Have a safe trip!"
-
-            returnObj["booking_status"] = "none"
-
-        # Handle specific driver info response
-        elif selected_driver and driver_summary:
-            name = driver_summary.get("name", "Unknown")
-            vehicles = driver_summary.get("vehicles", [])
-
-            # Check for specific information requests
-            if "image" in last_user_message or "photo" in last_user_message:
-                images = []
-                for v in vehicles:
-                    if "images: " in v:
-                        img_part = v.split("images: ")[1]
-                        if img_part.startswith("[") and img_part.endswith("]"):
-                            img_part = img_part[1:-1]  # Remove brackets
-                        images.extend([img.strip().strip("'\"") for img in img_part.split(",") if img.strip()])
-
-                if images:
-                    response_content = f"Here are the images for {name}'s vehicle:\n" + "\n".join(images[:3])  # Show first 3 images
-                else:
-                    response_content = f"I couldn't find any images for {name}'s vehicle."
-
-            elif any(v_type in last_user_message for v_type in ["vehicle", "sedan", "suv", "hatchback", "car"]):
-                vehicle_types = []
-                for v in vehicles:
-                    if "vehicle_type: " in v:
-                        vehicle_types.append(v.split("vehicle_type: ")[1].split(" ")[0])
-
-                if vehicle_types:
-                    response_content = f"{name} drives: {', '.join(set(vehicle_types))}."
-                else:
-                    response_content = f"I don't have vehicle information for {name}."
-
-            elif "married" in last_user_message or "marital" in last_user_message:
-                response_content = f"{name} is {'married' if driver_summary.get('married') else 'not married'}."
-
-            elif "profile" in last_user_message or "link" in last_user_message:
-                profile_url = driver_summary.get('profile_url', '')
-                if profile_url:
-                    response_content = f"Here is {name}'s profile: {profile_url}"
-                else:
-                    response_content = f"I don't have a profile link for {name}."
-
-            elif "experience" in last_user_message:
-                exp = driver_summary.get('experience', 0)
-                response_content = f"{name} has {exp} years of driving experience."
-
-            elif "contact" in last_user_message or "phone" in last_user_message:
-                phone = driver_summary.get('phone', '')
-                if phone:
-                    response_content = f"You can contact {name} at: {phone}"
-                else:
-                    response_content = f"I don't have contact information for {name}."
-
-            else:
-                age = driver_summary.get("age", "Not specified")
-                city = driver_summary.get("city", "Unknown")
-                experience = driver_summary.get("experience", 0)
-                languages = driver_summary.get("languages", [])
-                pet_allowed = driver_summary.get("pet_allowed", False)
-                phone = driver_summary.get("phone", "")
-                gender = driver_summary.get("gender", "")
-                per_km_cost = driver_summary.get("per_km_cost", [0])
-
-                vehicle_text = ", ".join(vehicles) if vehicles else "unknown vehicle"
-                language_text = ", ".join(languages) if languages else "not specified"
-                pet_text = "allows pets" if pet_allowed else "doesn't allow pets"
-                pronoun = "She" if gender.lower() == "female" else "He"
-                avg_cost = sum(per_km_cost) / len(per_km_cost) if per_km_cost else 0
-
-                response_content = f"{name} is {age} years old from {city} with {experience} years of experience. "
-                response_content += f"{pronoun} drives {vehicle_text} and charges around ₹{avg_cost:.0f} per km. "
-                response_content += f"{pronoun} speaks {language_text} and {pet_text}."
-
-                if phone:
-                    response_content += f"\n\n📞 Contact: {phone}"
-                if driver_summary.get("profile_url"):
-                    response_content += f"\n👤 Profile: {driver_summary['profile_url']}"
-
-            returnObj["driver_summary"] = None
-            returnObj["current_driver"] = None
-
-        # FIXED: Handle driver search results with proper filtering
-        elif current_drivers:
-            filter_text = self._format_filter_summary(active_filters) if is_filtered else ""
-
-            response_content = f"I found {len(current_drivers)} driver{'s' if len(current_drivers) != 1 else ''} in {search_city}{filter_text}:\n\n"
-
-            for i, driver in enumerate(current_drivers, 1):
-                try:
-                    if not search_city:
-                        response_content += f"{i}. {driver['driver_name']} - Details unavailable\n"
-                        continue
-
-                    cache_key = self.client._generate_cache_key(search_city, page)
-                    logger.debug(f"cache_key: {cache_key}, and search_city: {search_city}, and page: {page}")
-                    full_driver_detail = await self.client._get_driver_detail(cache_key, driver["driver_id"])
-
-                    logger.debug(f"full_driver_detail: {full_driver_detail}")
-
-                    vehicle_types = [v.vehicle_type for v in full_driver_detail.verified_vehicles]
-                    per_km_cost = [v.per_km_cost for v in full_driver_detail.verified_vehicles]
-                    vehicle_text = ", ".join(set(vehicle_types)) or "unknown"
-                    experience = full_driver_detail.experience if full_driver_detail.experience > 0 else full_driver_detail.experience + 1
-
-
-                    response_content += f"{i}. {full_driver_detail.name} {experience} yrs exp, {vehicle_text}, ₹{per_km_cost}/km\n"
-
-                except Exception as e:
-                    logger.warning(f"Could not get details for driver {driver['driver_id']}: {e}")
-                    response_content += f"{i}. {driver['driver_name']} - Details unavailable\n"
-
-            # FIXED: Better call-to-action based on state
-            if has_more_results:
-                response_content += "\nSay 'show more' to see more drivers."
-            elif not is_filtered:
-                response_content += "\nYou can ask me about any specific driver, apply filters, or book one of them!"
-            else:
-                response_content += "\nYou can ask me about any specific driver, modify filters, or book one of them!"
-
-            returnObj["current_driver"] = None
-            returnObj["is_filtered"] = False
-
-        # Handle no drivers found after filtering
-        elif is_filtered and not current_drivers and active_filters:
-            filter_summary = self._format_filter_summary(active_filters)
-            response_content = f"No drivers found in {search_city}{filter_summary}. Would you like to remove some filters or try different criteria?"
-
-        # FIXED: Better initial guidance
-        else:
-            pickup = state.get("pickupLocation")
-            drop = state.get("dropLocation")
-            trip_type = state.get("trip_type")
-
-            if not pickup and not drop and not trip_type:
-                response_content = "Hello! I'm here to help you book a cab. To get started, I need to know:\n\n"
-                response_content += "• **Pickup location** (which city?)\n"
-                response_content += "• **Destination** (where are you going?)\n"
-                response_content += "• **Trip type** (one-way, round-trip, or multi-city)\n\n"
-                response_content += "For example, you can say: 'I need a cab from Delhi to Jaipur for a one-way trip'"
-
-            elif pickup and not drop:
-                response_content = f"I see you want to travel from {pickup}. Where would you like to go? Please tell me your destination."
-
-            elif not pickup and drop:
-                response_content = f"I see you want to go to {drop}. Where will you be starting your journey from?"
-
-            elif not pickup and not drop and not trip_type:
-                response_content = f"ok, you want to travel from {pickup} to {drop}, can you provide me with the trip type? For example, you can say: 'I need a one-way trip or a round-trip'"
-
-            elif not search_city:
-                response_content = "I have your trip details but I'm not sure which city to search for drivers in. Could you clarify?"
-
-            else:
-                response_content = "How can I help you with your cab booking today? You can ask me to find drivers, apply filters, or get information about specific drivers."
+        response_chain = prompt | self.llm
 
         try:
-            ai_message = AIMessage(content=response_content)
-            logger.info(f"Generated AI Response: {response_content}")
-            returnObj["messages"] = [ai_message]
-            return returnObj
+            response_content = await response_chain.ainvoke({"state_summary": state_summary})
+
+            ai_message = AIMessage(content=response_content.content)
+            logger.info(f"Generated AI Response: {ai_message.content}")
+
+            # Clear single-turn state variables after they have been used for a response
+            new_state = {
+                "messages": [ai_message],
+                "last_error": None,
+                "driver_summary": None,
+            }
+            # Reset booking status after confirmation is sent
+            if state.get("booking_status") == "confirmed":
+                new_state["booking_status"] = "none"
+                new_state["booking_details"] = None
+
+            return new_state
 
         except Exception as e:
             logger.error(f"Error generating response: {e}", exc_info=True)

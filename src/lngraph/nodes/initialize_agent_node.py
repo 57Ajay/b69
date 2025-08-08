@@ -6,47 +6,44 @@ logger = logging.getLogger(__name__)
 
 class InitializeAgentNode:
     """
-    Node to initialize the agent's state ONLY if not already initialized.
+    Node to initialize the agent's state for the current turn.
     """
 
     def __init__(self):
         """
         Initializes the InitializeAgentNode.
-        This node is self-contained and doesn't require external dependencies.
         """
         pass
 
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
-        CRITICAL FIX: Only update last_user_message, preserve all other state.
-        Ensures that state variables are not reset unexpectedly.
+        CRITICAL FIX: Clears the previous turn's error state to prevent loops
+        and ensures the agent starts fresh with the new user message.
 
         Args:
             state: The current state of the agent.
 
         Returns:
-            A dictionary with minimal state updates.
+            A dictionary with the minimal state updates for the new turn.
         """
         logger.info("Executing InitializeAgentNode...")
 
-        # Get the last user message
-        last_message = ""
+        # Get the latest user message from the history
+        last_user_message = ""
         if state.get("messages") and len(state["messages"]) > 0:
-            last_message = state["messages"][-1].content
+            # Ensure we are looking at the last message, which should be from the user
+            last_user_message = state["messages"][-1].content
 
         updates = {
-            "last_user_message": last_message,
+            "last_user_message": last_user_message,
         }
 
-        if state.get("last_error") and not state.get("search_city"):
+        # If an error was present from the last turn, clear it now that we are
+        # processing a new input. This is crucial to prevent the agent from
+        # getting stuck on a previous failure.
+        if state.get("last_error"):
             updates["last_error"] = ""
             updates["failed_node"] = ""
 
-        # logger.debug(f"Preserving state for session {state.get('session_id')}")
-        # logger.debug(f"Current search_city: {state.get('search_city')}")
-        # # logger.debug(f"Current drivers count: {len(state.get('current_drivers', []))}")
-        # # logger.debug(f"All drivers count: {len(state.get('all_drivers', []))}")
-        # logger.debug(f"Active filters: {state.get('active_filters', {})}")
-        # logger.debug(f"Is filtered: {state.get('is_filtered', False)}")
-
+        logger.debug(f"Initializing turn with user message: '{last_user_message}'")
         return updates

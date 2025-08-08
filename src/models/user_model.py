@@ -4,7 +4,6 @@ from typing import List
 
 class UserModel(BaseModel):
     id: str
-    username: str
     name: str
     phone_no: str
     profile_image: str

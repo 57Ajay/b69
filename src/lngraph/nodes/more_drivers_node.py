@@ -126,8 +126,8 @@ class MoreDriversNode:
 
                 return {
                     "current_page": next_page,
-                    "current_drivers": new_driver_entries, # Show only the new drivers to the user
-                    "all_drivers": updated_all_drivers,    # Keep track of all drivers seen
+                    "current_drivers": new_driver_entries,
+                    "all_drivers": updated_all_drivers,
                     "has_more_results": tool_response.get("has_more", False),
                     "last_error": None,
                     "failed_node": None,

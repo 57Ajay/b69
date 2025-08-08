@@ -1,0 +1,53 @@
+
+ajay57 in ~/Projects/py/b69 on main λ uv run main.py
+2025-08-08 14:10:57,048 - INFO - Initializing services...
+2025-08-08 14:10:59,309 - INFO - Building the agent graph...
+
+🚗 Cab Booking Agent is ready! Type 'exit' to end the conversation.
+============================================================
+💬 You can ask me to:
+  • Find drivers: 'book me a cab from delhi to jaipur'
+  • Get driver info: 'tell me about ramesh' or 'ramesh phone number'
+  • Apply filters: 'show me SUV drivers' or 'drivers with 5+ years experience'
+  • Book a ride: 'book with ramesh'
+------------------------------------------------------------
+
+👤 You: book me a ride
+🚗 Agent: 2025-08-08 14:11:03,992 - INFO - Executing InitializeAgentNode...
+2025-08-08 14:11:03,994 - INFO - Executing ClassifyIntentNode...
+2025-08-08 14:11:07,192 - INFO - Classified intent as: booking_or_confirmation_intent
+state city: None
+DEBUG: Routing intent 'booking_or_confirmation_intent' with has_complete_trip_info: False
+2025-08-08 14:11:07,193 - INFO - Executing TripInfoCollectionNode...
+2025-08-08 14:11:07,193 - INFO - Current state before extraction - Pickup: None, Drop: None, Type: one-way, Duration: None
+2025-08-08 14:11:08,368 - INFO - LLM Extracted: pickup_location=None drop_location=None trip_type=None trip_duration=None
+2025-08-08 14:11:08,369 - INFO - Final state after validation - Pickup: None, Drop: None, Type: one-way, Duration: None, Complete: False
+DEBUG: Trip info incomplete, generating response to ask for missing info
+2025-08-08 14:11:08,370 - INFO - Executing ResponseGeneratorNode...
+2025-08-08 14:11:09,605 - INFO - Generated AI Response: I need to know your pickup location to find drivers. Which city are you starting from?
+2025-08-08 14:11:09,606 - INFO - Executing ClassifyIntentNode...
+2025-08-08 14:11:10,621 - INFO - Classified intent as: driver_search_intent
+state city: None
+DEBUG: Routing intent 'driver_search_intent' with has_complete_trip_info: False
+2025-08-08 14:11:10,622 - INFO - Executing TripInfoCollectionNode...
+2025-08-08 14:11:10,622 - INFO - Current state before extraction - Pickup: None, Drop: None, Type: one-way, Duration: None
+2025-08-08 14:11:11,854 - INFO - LLM Extracted: pickup_location=None drop_location=None trip_type=None trip_duration=None
+2025-08-08 14:11:11,854 - INFO - Final state after validation - Pickup: None, Drop: None, Type: one-way, Duration: None, Complete: False
+DEBUG: Trip info incomplete, generating response to ask for missing info
+2025-08-08 14:11:11,854 - INFO - Executing ResponseGeneratorNode...
+2025-08-08 14:11:13,183 - INFO - Generated AI Response: I need to know your pickup location to find drivers. Which city are you starting from?
+2025-08-08 14:11:13,183 - INFO - Executing ClassifyIntentNode...
+2025-08-08 14:11:14,215 - INFO - Classified intent as: driver_search_intent
+state city: None
+DEBUG: Routing intent 'driver_search_intent' with has_complete_trip_info: False
+2025-08-08 14:11:14,216 - INFO - Executing TripInfoCollectionNode...
+2025-08-08 14:11:14,216 - INFO - Current state before extraction - Pickup: None, Drop: None, Type: one-way, Duration: None
+2025-08-08 14:11:15,439 - INFO - LLM Extracted: pickup_location=None drop_location=None trip_type=None trip_duration=None
+2025-08-08 14:11:15,439 - INFO - Final state after validation - Pickup: None, Drop: None, Type: one-way, Duration: None, Complete: False
+DEBUG: Trip info incomplete, generating response to ask for missing info
+2025-08-08 14:11:15,440 - INFO - Executing ResponseGeneratorNode...
+2025-08-08 14:11:16,772 - INFO - Generated AI Response: I need to know your pickup location to find drivers. Which city are you starting from?
+2025-08-08 14:11:16,773 - INFO - Executing ClassifyIntentNode...
+^C
+Exiting...
+ajay57 in ~/Projects/py/b69 on main λ

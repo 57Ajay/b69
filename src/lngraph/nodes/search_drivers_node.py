@@ -1,29 +1,18 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from src.models.agent_state_model import AgentState
 import logging
 from langchain_google_vertexai import ChatVertexAI
-from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
 from src.lngraph.tools.driver_tools import DriverTools
 from src.models.drivers_model import DriverModel
 
 logger = logging.getLogger(__name__)
 
-# --- Pydantic Model for Structured LLM Output ---
-
-class SearchEntities(BaseModel):
-    """
-    Pydantic model for extracting entities required for a driver search.
-    """
-    city: Optional[str] = Field(
-        default=None,
-        description="The city where the user wants to find a driver, e.g., 'delhi', 'mumbai'."
-    )
 
 class SearchDriversNode:
     """
-    Node to handle the driver search intent. It extracts necessary entities,
-    calls the appropriate tool, and updates the agent's state.
+    FIXED: Node to handle the driver search intent. It now relies on the state
+    being populated by the TripInfoCollectionNode and the router, removing
+    redundant and error-prone entity extraction.
     """
 
     def __init__(self, llm: ChatVertexAI, driver_tools: DriverTools):
@@ -31,7 +20,7 @@ class SearchDriversNode:
         Initializes the SearchDriversNode.
 
         Args:
-            llm: An instance of a language model for entity extraction.
+            llm: An instance of a language model (kept for potential future use but not for city extraction).
             driver_tools: An instance of the DriverTools class.
         """
         self.llm = llm
@@ -39,7 +28,7 @@ class SearchDriversNode:
 
     async def execute(self, state: AgentState) -> Dict[str, Any]:
         """
-        Executes the driver search logic.
+        Executes the driver search logic, assuming the city is already present in the state.
 
         Args:
             state: The current state of the agent.
@@ -49,59 +38,43 @@ class SearchDriversNode:
         """
         logger.info("Executing SearchDriversNode...")
 
+        # The router now ensures search_city is populated from pickupLocation before calling this node.
         city = state.get("search_city")
-        user_message = state["last_user_message"]
 
-        # 1. Extract city if not already in state
         if not city:
-            logger.debug("City not in state, attempting to extract from message.")
-            extract_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are an entity extraction expert. From the user's message, extract the city they want to search for a cab in.
-                Only extract if a city is explicitly mentioned. If no city is mentioned, return null for the city field.
-                Examples:
-                - "find me a cab in delhi" -> city: "delhi"
-                - "book me a cab" -> city: null
-                - "i need a ride from mumbai" -> city: "mumbai" """),
-                ("human", "{user_message}")
-            ])
-            extract_chain = extract_prompt | self.llm.with_structured_output(SearchEntities)
-            try:
-                raw = await extract_chain.ainvoke({"user_message": user_message})
-                entities = SearchEntities.model_validate(raw)
-                city = entities.city
-            except Exception as e:
-                logger.error(f"Error during entity extraction: {e}", exc_info=True)
-                return {"last_error": "Failed to understand the city from your message.", "failed_node": "search_drivers_node"}
+            # This should ideally not be reached due to the new router logic, but serves as a safeguard.
+            logger.error("SearchDriversNode was called without a city in the state.")
+            return {
+                "last_error": "I'm missing the city to search in. Could you please clarify your pickup location?",
+                "failed_node": "search_drivers_node"
+            }
 
-        # 2. Check if we have a city to search for
-        if not city:
-            logger.warning("No city found in message or state. Asking user for clarification.")
-            return {"last_error": "I need to know which city you're looking for a cab in. Please specify the city.", "failed_node": "search_drivers_node"}
+        logger.info(f"Performing a new driver search in city: {city}")
 
-        logger.info(f"Performing driver search in city: {city}")
-
-        # 3. Call the search tool
         try:
-            # For a new search, always start at page 1
+            # A new search always starts from page 1 and clears previous filters.
             current_page = 1
             tool_response = await self.driver_tools.search_drivers_tool.ainvoke({
                 "city": city,
                 "page": current_page,
-                "limit": state["limit"], # Use limit from state (e.g., 5)
+                "limit": state.get("limit", 5),
+                "use_cache": True, # Use cache for initial searches
             })
 
             if tool_response.get("success"):
                 drivers: List[DriverModel] = tool_response.get("drivers", [])
                 driver_count = len(drivers)
 
-                logger.info(f"Successfully found {driver_count} drivers.")
+                logger.info(f"Successfully found {driver_count} drivers for the new search.")
 
-                # CRITICAL: Reset state for a new search
+                driver_details_for_state = [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers]
+
+                # CRITICAL: A new search resets the entire driver and filter context.
                 return {
                     "search_city": city,
                     "current_page": current_page,
-                    "current_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
-                    "all_drivers": [{"driver_name": driver.name, "driver_id": driver.id} for driver in drivers],
+                    "current_drivers": driver_details_for_state,
+                    "all_drivers": driver_details_for_state,
                     "total_results": tool_response.get("total", 0),
                     "has_more_results": tool_response.get("has_more", False),
                     "is_filtered": False,
@@ -114,8 +87,10 @@ class SearchDriversNode:
             else:
                 error_msg = tool_response.get('error', 'An unknown error occurred while searching.')
                 logger.error(f"Driver search tool failed: {error_msg}")
+                # If the API fails for a valid city, it might be an issue with our service.
+                user_friendly_error = f"I'm sorry, I couldn't find any drivers in {city} at the moment. It might be a temporary issue. Please try again shortly."
                 return {
-                    "last_error": tool_response.get("msg", error_msg),
+                    "last_error": user_friendly_error,
                     "failed_node": "search_drivers_node",
                     "current_drivers": [],
                     "all_drivers": [],
@@ -123,7 +98,7 @@ class SearchDriversNode:
         except Exception as e:
             logger.critical(f"A critical error occurred in SearchDriversNode: {e}", exc_info=True)
             return {
-                "last_error": "A system error occurred. Please try again later.",
+                "last_error": "A system error occurred while searching for drivers. Please try again later.",
                 "failed_node": "search_drivers_node",
                 "current_drivers": [],
                 "all_drivers": [],
