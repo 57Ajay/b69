@@ -84,7 +84,7 @@ class GetDriverInfoNode:
             }
 
         # Use all_drivers for broader context, as current_drivers might be a paginated subset
-        available_drivers = state.get("all_drivers", [])
+        available_drivers = state.get("current_drivers", [])
 
         if not available_drivers:
             logger.warning("No drivers available in the state for info request.")

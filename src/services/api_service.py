@@ -17,6 +17,8 @@ class DriversAPIClient:
         self.client = httpx.AsyncClient(timeout=30.0)
         self.redis_service = redis_service
         self.cache_duration = timedelta(minutes=cache_duration_minutes)
+        self.create_trip_url = "https://cabbot-botcreatetrip-x7ozexvczq-uc.a.run.app"
+        self.send_availability_endpoint = "/cabbot-botSendAvilabilityRequestToDrivers"
         self.session_id = session_id
 
     def _generate_cache_key(self, city: str, page: int) -> str:
@@ -231,6 +233,67 @@ class DriversAPIClient:
             # Clear all cache
             await self.redis_service.clear_all()
             logger.info("Cleared all cache")
+
+    async def create_trip(
+            self,
+            customer_details: Dict[str, Any],
+            pickup_location: str,
+            drop_location: str,
+            start_date: str,
+            end_date: str,
+            trip_type: str,
+        ) -> Optional[str]:
+            """
+            FIXED: Creates a trip record and returns the tripId.
+            This method is now decoupled from the AgentState.
+            """
+            try:
+                trip_payload = {
+                    "customerId": customer_details.get("id"),
+                    "customerName": customer_details.get("name"),
+                    "customerPhone": customer_details.get("phone_no"),
+                    "customerProfileImage": customer_details.get("profile_image", ""),
+                    "pickUpLocation": {"city": pickup_location, "placeName": pickup_location},
+                    "dropLocation": {"city": drop_location, "placeName": drop_location},
+                    "startDate": start_date,
+                    "endDate": end_date,
+                    "tripType": trip_type,
+                }
+                response = await self.client.post(self.create_trip_url, json=trip_payload)
+                response.raise_for_status()
+                data = response.json()
+                trip_id: str = data.get("tripId")
+                logger.info(f"Successfully created trip with ID: {trip_id}")
+                return trip_id
+            except httpx.HTTPStatusError as e:
+                logger.error(f"HTTP error creating trip: {e.response.status_code} - {e.response.text}")
+                return None
+            except Exception as e:
+                logger.error(f"Unexpected error creating trip: {e}")
+                return None
+
+
+    async def send_avilability_request(self, driverIds: List[str], tripId: str, data: Dict[str, Dict[str, str]]):
+        try:
+
+            url = f"{self.base_url}{self.send_availability_endpoint}"
+
+            response = await self.client.post(url, json=data)
+
+            response.raise_for_status()
+
+            data = response.json()
+            logger.info(f"Successfully sent availability request for trip {tripId}")
+            success = data.get("success")
+            if success == True:
+                return True
+            else:
+                return False
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error sending availability request: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            logger.error(f"Unexpected error sending availability request: {e}")
 
     async def close(self):
         """Close HTTP client"""

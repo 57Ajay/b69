@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
@@ -154,3 +155,15 @@ class SearchDriversInput(BaseModel):
     use_cache: bool = Field(
         default=True, description="Whether to use cached results for faster response"
     )
+
+
+class CreateTripInput(BaseModel):
+    customer_id: Optional[str] = Field(None, description="ID of the customer")
+    customer_name: Optional[str] = Field(None, description="Name of the customer")
+    customer_phone: Optional[str] = Field(None, description="Phone number of the customer")
+    customer_profile_image_url: Optional[str] = Field(None, description="URL of the customer's profile image")
+    pickup_location: Optional[str] = Field(None, description="Pickup location")
+    dropoff_location: str = Field(..., description="Dropoff location")
+    trip_type: str = Field(..., description="Type of trip: 'one-way' or 'round-trip', or 'multi city' etc...")
+    start_date: datetime = Field(..., description="Start date of the trip, in iso format. ex: 2023-09-25T12:00:00")
+    end_date: datetime = Field(..., description="End date of the trip, in iso format. ex: 2023-09-25T12:00:00")

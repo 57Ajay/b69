@@ -1,0 +1,132 @@
+📡 DRIVER AVAILABILITY REQUEST API DOCUMENTATION
+
+Endpoint:
+POST https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botSendAvilabilityRequestToDrivers
+
+Description:
+Sends trip availability requests to a list of drivers via push notifications and WhatsApp (if available). Useful for real-time driver coordination.
+
+---
+
+📥 Request Body (JSON):
+trip id we got from trip creatiin api
+-> { driverIds, data, tripId } = req.body;
+-> { trip_details, message: customMessage, customerDetails } = data;
+-> { from, to, trip_date, trip_time, trip_type } = tripDetails;
+-> { name, id, phoneNo, profile_image } = customerDetails
+
+driverIds: string[]
+
+ex: -> {
+  "driverIds": [
+    "pv258iLSjtfyBHyLgRjQcShJDt92",
+    "NewcOnEO5DdiDkhKwc8LjGapICB3",
+    "sHRv1ZZJ3pWKqH2yAo8OhRkwZPn2"
+  ],
+  "data": {
+    "trip_details": {
+      "from": "delhi",
+      "to": "jaipur",
+      "trip_time": "12:00 PM",
+      "trip_date": "08/07/25",
+      "trip_type": "one-way"
+    },
+    "customerDetails": {
+      "name": "Ajay Upadhyay",
+      "id": "mXghqeK6O9TueSASXObqFkggX8l1",
+      "phoneNo": "+917470468734",
+      "profile_image": "https://example.com/image.jpg"
+    },
+    "message": "Optional custom message if needed"
+  }
+}
+
+---
+
+🧠 Request Fields Explained:
+
+- driverIds: Array of driver IDs to whom the request will be sent.
+- data:
+  - trip_details:
+    - from: Origin city.
+    - to: Destination city.
+    - trip_time: Scheduled trip time (12-hour format).
+    - trip_date: Trip date (MM/DD/YY).
+    - trip_type: Type of trip ("one-way" or "round-trip").
+  - customerDetails:
+    - name: Customer's name.
+    - id: Customer's unique ID.
+    - phoneNo: Customer's phone number.
+    - profile_image: URL to profile image.
+  - message: Optional custom message to send with the request.
+
+---
+
+✅ Response (200 OK):
+
+{
+  "success": true,
+  "message": "Availability requests process completed.",
+  "summary": {
+    "totalDrivers": 3,
+    "successCount": 3,
+    "failureCount": 0
+  },
+  "details": [
+    {
+      "driverId": "pv258iLSjtfyBHyLgRjQcShJDt92",
+      "status": "success",
+      "push": {
+        "success": true,
+        "successCount": 0,
+        "failureCount": 4
+      },
+      "whatsapp": {
+        "success": false,
+        "error": {
+          "result": false,
+          "message": "Invalid token provided"
+        }
+      }
+    },
+    ...
+  ]
+}
+
+---
+
+📊 Response Fields:
+
+- success: Boolean indicating if the request ran successfully.
+- message: Status message.
+- summary:
+  - totalDrivers: Number of drivers the request was sent to.
+  - successCount: Count of drivers who received the message successfully.
+  - failureCount: Count of failures.
+- details: Per-driver delivery result:
+  - driverId: Target driver ID.
+  - status: "success" or "failure" (based on push/WhatsApp results).
+  - push: Contains success, successCount, and failureCount.
+  - whatsapp: Contains success and error details if applicable.
+
+---
+
+💥 Errors:
+
+- Push or WhatsApp errors per driver are returned inside the `details` field.
+- For example: `Invalid token provided` in WhatsApp section.
+
+---
+
+🧪 Example cURL:
+
+curl -X POST https://us-central1-cabswale-ai.cloudfunctions.net/cabbot-botSendAvilabilityRequestToDrivers \
+  -H "Content-Type: application/json" \
+  -d '{ "driverIds": [...], "data": { ... } }'
+
+---
+
+📌 Notes:
+- Useful for dispatching trip offers to multiple drivers.
+- Even if some messages fail (e.g. WhatsApp token error), push may still succeed.
+- Handle partial failures by inspecting the `details` array.

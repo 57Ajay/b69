@@ -9,6 +9,7 @@ from src.lngraph.tools.driver_tools import DriverTools
 from src.lngraph.graph import create_agent_graph
 import logging
 from src.models.agent_state_model import AgentState
+from src.services.get_current_indian_date import indian_time
 
 # --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -43,13 +44,12 @@ async def main():
     print("\n🚗 Cab Booking Agent is ready! Type 'exit' to end the conversation.")
     print("=" * 60)
 
-    # CRITICAL FIX: Initialize with complete state structure including new fields
+    indian_date = indian_time
     conversation_state: AgentState = {
         "session_id": session_id,
         "messages": [],
         "user": UserModel(
             id="user123",
-            username="cab_user",
             name="Cab User",
             phone_no="1234567890",
             preferred_languages=["english"],
@@ -79,8 +79,11 @@ async def main():
         "booking_details": None,
         "dropLocation": None,
         "pickupLocation": None,
-        "trip_type": "one-way",
+        "trip_type": "",
         "trip_duration": None,
+        "today_date": indian_date,
+        "trip_start_date": None,
+        "trip_end_date": None,
         "full_trip_details": False,
         "trip_doc_id": "",
         "last_error": None,

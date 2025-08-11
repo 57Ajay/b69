@@ -8,6 +8,7 @@ from langchain_core.tools import tool
 import logging
 from src.services.api_service import DriversAPIClient
 from src.models.tool_model import (
+    CreateTripInput,
     SearchDriversInput,
     DriverInfoInput,
     BookDriverInput,
@@ -31,6 +32,7 @@ class DriverTools:
         self.search_drivers_tool = self._create_search_drivers_tool()
         self.get_driver_info_tool = self._create_get_driver_info_tool()
         self.book_or_confirm_ride_with_driver = self._create_book_driver_tool()
+        self.create_trip = self._create_trip_tool()
 
     def _create_search_drivers_tool(self):
         """Create the search drivers tool with bound API client"""
@@ -173,3 +175,28 @@ class DriverTools:
                 return {"success": False, "msg": "Failed to get the driver", "error": e}
 
         return book_or_confirm_ride_with_driver
+
+
+
+    def _create_trip_tool(self):
+        """Create the create trip tool with bound API client"""
+        @tool(
+            description="Create a trip for a customer, requires customer details and trip details, and called when we have complete booking information",
+            args_schema=CreateTripInput,
+        )
+        async def create_trip_tool(customer_id: str, customer_name: str, customer_phone: str, customer_profile_image_url: str, pickup_location: str, dropoff_location: str, end_date: str, start_date: str, trip_type: str) -> Dict[str, Union[bool, str, Exception]]:
+
+            customer_details = {
+                "id": customer_id,
+                "name": customer_name,
+                "phone": customer_phone,
+                "profile_image": customer_profile_image_url
+            }
+
+            result = await self.api_client.create_trip(customer_details, pickup_location, dropoff_location, start_date, end_date, trip_type)
+            if result is None:
+                return {"success": False, "msg": "Failed to create trip"}
+
+            return {"success": True, "trip_id": result}
+
+        return create_trip_tool

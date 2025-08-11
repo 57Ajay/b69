@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, Any, List, Dict, TypedDict
 from langchain_core.messages import BaseMessage
 from src.models.user_model import UserModel
@@ -49,10 +50,13 @@ class AgentState(TypedDict):
     booking_details: Optional[Dict[str, Any]]
 
     # --- Trip Details ---
+    today_date: Optional[str]
     dropLocation: Optional[str]
     pickupLocation: Optional[str]
     trip_type: str
     trip_duration: Optional[int]
+    trip_start_date: Optional[datetime]
+    trip_end_date: Optional[datetime]
     full_trip_details: bool
     trip_doc_id: Optional[str]
 

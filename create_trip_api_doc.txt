@@ -1,0 +1,64 @@
+🚖 CREATE TRIP API DOCUMENTATION
+
+Endpoint:
+POST https://cabbot-botcreatetrip-x7ozexvczq-uc.a.run.app
+
+Description:
+Creates a new cab trip for a customer, including pickup/drop info, dates, trip type, and status.
+
+---
+
+📥 Request Body (JSON):
+-> { customerId, customerName, customerPhone, customerProfileImage = "", pickUpLocation, dropLocation, endDate, startDate, tripType } = req.body
+
+---
+
+🧠 Request Fields Explained:
+
+- customer: Object containing customer data.
+  - id: Unique ID of the customer.
+  - name: Full name.
+  - phone: Phone number in international format.
+  - profileImage: URL of profile picture.
+  - dropLocation / pickUpLocation:
+    - city: City name.
+    - coordinates: GPS coordinates (optional/empty).
+    - placeName: Specific location name or same as city.
+ startDate: When the trip is scheduled to begin.
+- endDate: When the trip is scheduled to end.
+- tripType: Type of trip. ("one-way" or "round-trip")
+
+---
+
+✅ Response (200 OK):
+
+{
+  "message": "Trip created successfully",
+  "tripId": "trip_abc123"
+}
+
+Fields:
+- message: Confirmation string.
+- tripId: Unique identifier of the created trip.
+
+---
+
+💥 Possible Errors:
+
+- 400 Bad Request – Missing or invalid fields.
+- 401 Unauthorized – Auth failure (if auth used).
+- 500 Internal Server Error – Server-side issue.
+
+---
+
+🧪 Example cURL:
+
+curl -X POST https://cabbot-botcreatetrip-x7ozexvczq-uc.a.run.app \
+  -H "Content-Type: application/json" \
+  -d '{ "customer": { ... }, "events": { ... }, ... }'
+
+---
+
+📌 Notes:
+- Coordinates can be added later.
+- Response includes `tripId` for further operations.
