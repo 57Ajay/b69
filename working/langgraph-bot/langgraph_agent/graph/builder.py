@@ -92,8 +92,9 @@ def agent_node(state: dict) -> dict:
         }
 
 
+# langgraph_agent/graph/builder.py - Updated tool_executor_node function
 def tool_executor_node(state: dict) -> dict:
-    """Execute tools requested by the agent, now with API-side filtering."""
+    """Execute tools requested by the agent, now with enhanced filter handling."""
     logger.info("---TOOL EXECUTOR NODE---")
 
     tool_calls = state.get("tool_calls", [])
@@ -133,6 +134,7 @@ def tool_executor_node(state: dict) -> dict:
                     "phone": state_updates.get("customer_phone"),
                     "profile_image": state_updates.get("customer_profile"),
                 }
+
             if tool_name == "check_driver_availability":
                 tool_args["trip_id"] = state_updates.get("trip_id")
                 tool_args["pickup_location"] = state_updates.get("pickup_location")
@@ -145,15 +147,27 @@ def tool_executor_node(state: dict) -> dict:
                     "profile_image": state_updates.get("customer_profile"),
                 }
 
-            # ***MODIFICATION: Pass filters directly to the get_drivers_for_city tool***
-            if tool_name == "get_drivers_for_city":
-                # Combine new filters from the LLM with any existing filters in the state
+            # Enhanced filter handling for get_drivers_for_city and apply_driver_filters
+            if tool_name in ["get_drivers_for_city", "apply_driver_filters"]:
                 current_filters = state_updates.get("applied_filters", {})
                 new_filters = tool_args.get("filters", {})
-                current_filters.update(new_filters)
-                tool_args["filters"] = current_filters
-                state_updates["applied_filters"] = current_filters # Persist combined filters
-                state_updates["pickup_location"] = tool_args.get("city")
+
+                # Merge filters - new filters override existing ones
+                merged_filters = current_filters.copy()
+                merged_filters.update(new_filters)
+
+                tool_args["filters"] = merged_filters
+
+                # Update state with merged filters
+                state_updates["applied_filters"] = merged_filters
+
+                # Set city context
+                if "city" not in tool_args and state_updates.get("pickup_location"):
+                    tool_args["city"] = state_updates["pickup_location"]
+
+                # Update pickup location if provided
+                if "city" in tool_args:
+                    state_updates["pickup_location"] = tool_args["city"]
 
             # Execute the tool
             output = tool_to_call.invoke(tool_args)
@@ -166,25 +180,30 @@ def tool_executor_node(state: dict) -> dict:
                     state_updates["drop_location"] = tool_args.get("drop_city")
                     state_updates["trip_type"] = tool_args.get("trip_type")
                     output["message"] = f"Trip created successfully from {tool_args.get('pickup_city')} to {tool_args.get('drop_city')}. Now I will find drivers for you."
-            elif tool_name == "get_drivers_for_city":
-                new_drivers = output.get("drivers", [])
 
-                # If it's a new search (page 1), reset the driver list
-                if tool_args.get("page", 1) == 1:
+            elif tool_name in ["get_drivers_for_city", "apply_driver_filters"]:
+                new_drivers = output.get("drivers", [])
+                page = output.get("page", 1)
+
+                # If it's a new search or filter application (page 1), reset the driver list
+                if page == 1:
                     state_updates["all_fetched_drivers"] = new_drivers
                     state_updates["current_display_index"] = 0
                     state_updates["fetch_count"] = 1
-                else: # Append drivers for pagination
+                    state_updates["current_page"] = 1
+                else:
+                    # Append drivers for pagination
                     all_drivers = state_updates.get("all_fetched_drivers", [])
                     all_drivers.extend(new_drivers)
                     state_updates["all_fetched_drivers"] = all_drivers
                     state_updates["fetch_count"] = state_updates.get("fetch_count", 0) + 1
+                    state_updates["current_page"] = page
 
-                # The filtered list is now the same as the fetched list
+                # The filtered list is the same as the fetched list for API-side filtering
                 state_updates["filtered_drivers"] = state_updates["all_fetched_drivers"]
-                state_updates["current_page"] = output.get("page", 1)
 
                 logger.info(
+                    f"Applied filters: {state_updates.get('applied_filters', {})} - "
                     f"Fetched {len(new_drivers)} drivers, total now: {len(state_updates['all_fetched_drivers'])}"
                 )
 
@@ -210,12 +229,13 @@ def tool_executor_node(state: dict) -> dict:
                         current_filters.pop(key, None)
                     state_updates["applied_filters"] = current_filters
 
-                # After removing filters, we need to signal a new search
+                # After removing filters, reset pagination and clear drivers to force new search
                 output = {"message": "Filters removed. Please search again to see updated results."}
                 state_updates["all_fetched_drivers"] = []
                 state_updates["filtered_drivers"] = []
                 state_updates["current_display_index"] = 0
                 state_updates["fetch_count"] = 0
+                state_updates["current_page"] = 1
 
             # Format the output for the LLM and create a ToolMessage
             output_str = format_tool_output(tool_name, output, state_updates)

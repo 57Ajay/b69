@@ -20,17 +20,54 @@ def get_drivers_for_city(city: str, page: int = 1, filters: Optional[Dict[str, A
     Args:
         city: The city name to search for drivers. This should be a valid Indian city.
         page: Page number for pagination (default: 1).
-        filters: (Optional) Dictionary of filter criteria to apply.
+        filters: (Optional) Dictionary of filter criteria to apply. Supported filters:
+            - minAge: number (e.g., 25)
+            - maxAge: number (e.g., 40)
+            - minExperience: number (e.g., 5)
+            - verifiedLanguages: string (e.g., "English", "Hindi")
+            - vehicleTypes: string (e.g., "suv", "sedan,hatchback")
+            - isPetAllowed: boolean (true/false)
+            - married: boolean (true/false)
+            - minConnections: number (e.g., 10)
+            - profileVerified: boolean (true/false)
+            - verified: boolean (true/false)
+            - minDrivingExperience: number (e.g., 5)
+            - allowHandicappedPersons: boolean (true/false)
+            - availableForCustomersPersonalCar: boolean (true/false)
+            - availableForDrivingInEventWedding: boolean (true/false)
+            - availableForPartTimeFullTime: boolean (true/false)
 
     Returns:
         Dictionary containing drivers and pagination info.
     """
     logger.info(f"Getting drivers for {city} (page {page}) with filters: {filters}")
 
+    # Ensure proper data types for filters based on API documentation
+    if filters:
+        processed_filters = {}
+        for key, value in filters.items():
+            if key in ['minAge', 'maxAge', 'minExperience', 'minConnections', 'minDrivingExperience']:
+                # Ensure numeric filters are integers
+                processed_filters[key] = int(value) if value is not None else None
+            elif key in ['isPetAllowed', 'married', 'profileVerified', 'verified',
+                        'allowHandicappedPersons', 'availableForCustomersPersonalCar',
+                        'availableForDrivingInEventWedding', 'availableForPartTimeFullTime']:
+                # Ensure boolean filters are proper booleans
+                if isinstance(value, str):
+                    processed_filters[key] = value.lower() in ['true', '1', 'yes']
+                else:
+                    processed_filters[key] = bool(value)
+            elif key in ['verifiedLanguages', 'vehicleTypes']:
+                # String filters - ensure they're strings
+                processed_filters[key] = str(value) if value is not None else None
+            else:
+                processed_filters[key] = value
+        filters = processed_filters
+
     drivers_data = api_client.get_drivers(city, page, config.DRIVERS_PER_FETCH, filters)
 
     if not drivers_data:
-        logger.info(f"No drivers found in {city}")
+        logger.info(f"No drivers found in {city} with filters {filters}")
         return {"drivers": [], "page": page, "has_more": False, "total_fetched": 0}
 
     processed_drivers = [
@@ -49,6 +86,31 @@ def get_drivers_for_city(city: str, page: int = 1, filters: Optional[Dict[str, A
     }
 
 
+@tool
+def apply_driver_filters(
+    city: str,
+    filters: Dict[str, Any],
+    reset_pagination: bool = True
+) -> Dict[str, Any]:
+    """
+    Apply specific filters to driver search and fetch filtered results.
+
+    Args:
+        city: The city to search drivers in
+        filters: Dictionary of filter criteria to apply
+        reset_pagination: Whether to reset to page 1 (default: True)
+
+    Returns:
+        Dictionary containing filtered drivers and updated pagination info
+    """
+    logger.info(f"Applying filters {filters} to drivers in {city}")
+
+    page = 1 if reset_pagination else 1
+
+    return get_drivers_for_city(city=city, page=page, filters=filters)
+
+
+# ... rest of your existing tools remain the same ...
 def process_driver_data(driver_data: Dict) -> Dict:
     """Process and format driver data from the new API response"""
     # Process vehicles
